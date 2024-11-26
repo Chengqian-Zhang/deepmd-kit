@@ -375,8 +375,6 @@ def compute_output_stats(
         bias_atom_e, std_atom_e = {}, {}
         for kk in keys:
             # use atomic bias whenever available
-            from IPython import embed
-            embed()
             if kk in bias_atom_a:
                 bias_atom_e[kk] = bias_atom_a[kk]
                 std_atom_e[kk] = std_atom_a[kk]

@@ -69,6 +69,7 @@ class PropertyLoss(TaskLoss):
             Other losses for display.
         """
         model_pred = model(**input_dict)
+        nbz = label["property"].shape[0]
         assert label["property"].shape[-1] == self.task_dim
         assert model_pred["property"].shape[-1] == self.task_dim
         loss = torch.zeros(1, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)[0]
@@ -100,6 +101,20 @@ class PropertyLoss(TaskLoss):
                     reduction="mean",
                 )
             )
+        elif self.loss_func == "crossentropy":
+            assert self.task_dim > 1, f"'fitting_net/task_dim' must be greater than 1 in classification tasks."
+            lprobs = F.log_softmax(model_pred["property"], dim=-1)
+            lprobs = lprobs.reshape(-1, lprobs.shape[-1])
+            targets = label["property"][:,0].reshape(-1).to(torch.int64)
+            assert len(lprobs.shape) == 2
+            assert len(targets.shape) == 1
+            assert lprobs.shape[0] == targets.shape[0]
+            loss += F.nll_loss(
+                lprobs,
+                targets,
+                reduction="sum",
+            )
+
         else:
             raise RuntimeError(f"Unknown loss function : {self.loss_func}")
 
@@ -131,6 +146,13 @@ class PropertyLoss(TaskLoss):
                     reduction="mean",
                 )
             ).detach()
+        if "acc" in self.metric:
+            assert self.loss_func == "crossentropy"
+            acc = (
+                torch.argmax(model_pred["property"], dim=-1)
+                == label["property"][:, 0]
+            ).sum() / len(label["property"])
+            more_loss["acc"] = acc.detach()
 
         return model_pred, loss, more_loss
 

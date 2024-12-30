@@ -100,6 +100,8 @@ class DeepmdData:
                 self.type_idx_map = np.array(
                     sorter[np.searchsorted(type_map, self.type_map, sorter=sorter)]
                 )
+                if "D" in self.type_map:
+                    print(type_map[self.type_idx_map[self.type_map.index("D")]])
                 # padding for virtual atom
                 self.type_idx_map = np.append(
                     self.type_idx_map, np.array([-1], dtype=np.int32)

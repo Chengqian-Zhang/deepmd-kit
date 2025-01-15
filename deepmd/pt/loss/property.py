@@ -65,6 +65,7 @@ class PropertyLoss(TaskLoss):
         self.out_std = out_std
         self.intensive = intensive
         self.var_name = var_name
+        self.activation = torch.nn.Softplus()
 
     def forward(self, input_dict, model, label, natoms, learning_rate=0.0, mae=False):
         """Return loss on properties .
@@ -151,6 +152,13 @@ class PropertyLoss(TaskLoss):
                     reduction="mean",
                 )
             )
+        elif self.loss_func == "msle":
+            model_pred[var_name] = self.activation(model_pred[var_name]) - 1
+            loss += F.mse_loss(
+                torch.log(label[var_name] + 1),
+                torch.log(model_pred[var_name] + 1),
+                reduction="sum",
+            )
         else:
             raise RuntimeError(f"Unknown loss function : {self.loss_func}")
 
@@ -181,6 +189,13 @@ class PropertyLoss(TaskLoss):
                     model_pred[var_name],
                     reduction="mean",
                 )
+            ).detach()
+        if "msle" in self.metric:
+            model_pred[var_name] = self.activation(model_pred[var_name]) - 1
+            more_loss["msle"] = F.mse_loss(
+                torch.log(label[var_name] + 1),
+                torch.log(model_pred[var_name] + 1),
+                reduction="mean",
             ).detach()
 
         return model_pred, loss, more_loss

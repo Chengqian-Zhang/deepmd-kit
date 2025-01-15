@@ -6,6 +6,7 @@ import logging
 from typing import (
     Optional,
 )
+from functools import lru_cache
 
 import numpy as np
 
@@ -501,6 +502,7 @@ class DeepmdData:
             data["box"] = None
         return data
 
+    @lru_cache
     def _load_set(self, set_name: DPPath):
         # get nframes
         if not isinstance(set_name, DPPath):

@@ -6,6 +6,7 @@ import logging
 from typing import (
     Optional,
 )
+from functools import lru_cache
 
 import numpy as np
 

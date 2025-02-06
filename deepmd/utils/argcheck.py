@@ -2606,6 +2606,58 @@ def loss_property():
         ),
     ]
 
+@loss_args_plugin.register("denoise")
+def loss_denoise():
+    doc_noise_type = ""
+    doc_noise = ""
+    doc_noise_mode = ""
+    doc_mask_prob = ""
+    doc_mask_coord = ""
+    doc_mask_box = ""
+    return [
+        Argument(
+            "noise_type",
+            str,
+            optional=True,
+            default="uniform",
+            doc=doc_noise_type,
+        ),
+        Argument(
+            "noise",
+            float,
+            optional=True,
+            default=0.2,
+            doc=doc_noise,
+        ),
+        Argument(
+            "noise_mode",
+            str,
+            optional=True,
+            default="prob",
+            doc=doc_noise_mode,
+        ),
+        Argument(
+            "mask_prob",
+            float,
+            optional=True,
+            default=0.2,
+            doc=doc_mask_prob,
+        ),
+        Argument(
+            "mask_coord",
+            bool,
+            optional=True,
+            default=True,
+            doc=doc_mask_coord,
+        ),
+        Argument(
+            "mask_box",
+            bool,
+            optional=True,
+            default=False,
+            doc=doc_mask_box,
+        ),
+    ]
 
 # YWolfeee: Modified to support tensor type of loss args.
 @loss_args_plugin.register("tensor")

@@ -2608,12 +2608,12 @@ def loss_property():
 
 @loss_args_plugin.register("denoise")
 def loss_denoise():
-    doc_noise_type = ""
-    doc_noise = ""
-    doc_noise_mode = ""
-    doc_mask_prob = ""
-    doc_mask_coord = ""
-    doc_mask_box = ""
+    doc_noise_type = "The type of noise to add to the coordinate."
+    doc_noise = "The magnitude of noise to add to the coordinate."
+    doc_noise_mode = "'prob' means the noise is added with a probability.'fix_num' means the noise is added with a fixed number."
+    doc_mask_prob = "The probability of masking a coordinate."
+    doc_mask_coord = "Whether to mask the coordinate."
+    doc_mask_box = "Whether to mask the box."
     return [
         Argument(
             "noise_type",

@@ -46,7 +46,18 @@ class DenoiseLoss(TaskLoss):
             Whether to use L1 loss, if False (default), it will use L2 loss.
         inference : bool
             If true, it will output all losses found in output, ignoring the pre-factors.
-        
+        noise_type : str
+            The type of noise to add to the coordinate. It can be 'uniform' or 'Gaussian'.
+        noise : float
+            The magnitude of noise to add to the coordinate.
+        noise_mode : str
+            "'prob' means the noise is added with a probability.'fix_num' means the noise is added with a fixed number."
+        mask_prob : float
+            The probability of masking a coordinate.
+        mask_coord : bool
+            Whether to mask the coordinate.
+        mask_box : bool
+            Whether to mask the box.
         **kwargs
             Other keyword arguments.
         """

@@ -109,7 +109,6 @@ class EnergyFittingNet(InvarFitting):
     exclude_types: list[int]
 
 
-@Fitting.register("direct_force")
 @Fitting.register("direct_force_ener")
 @fitting_check_output
 class EnergyFittingNetDirect(Fitting):
@@ -145,8 +144,6 @@ class EnergyFittingNetDirect(Fitting):
             Element count.
         dim_descrpt : int
             Embedding width per atom.
-        dim_out : int
-            The output dimension of the fitting net.
         neuron : list[int]
             Number of neurons in each hidden layers of the fitting net.
         bias_atom_e : torch.Tensor, optional

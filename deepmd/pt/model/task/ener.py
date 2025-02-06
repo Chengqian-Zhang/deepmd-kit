@@ -265,7 +265,7 @@ class EnergyFittingNetDirect(Fitting):
             + self.dim_case_embd
         )
 
-        self.filter_layers_dipole = NetworkCollection(
+        self.filter_layers_force = NetworkCollection(
             1 if not self.mixed_types else 0,
             self.ntypes,
             network_type="fitting_network",
@@ -377,7 +377,7 @@ class EnergyFittingNetDirect(Fitting):
             "precision": self.precision,
             "mixed_types": self.mixed_types,
             "energy_nets": self.filter_layers.serialize(),
-            "force_nets": self.filter_layers_dipole.serialize(),
+            "force_nets": self.filter_layers_force.serialize(),
             "rcond": self.rcond,
             "exclude_types": self.exclude_types,
             "@variables": {
@@ -412,7 +412,7 @@ class EnergyFittingNetDirect(Fitting):
         for kk in variables.keys():
             obj[kk] = to_torch_tensor(variables[kk])
         obj.filter_layers = NetworkCollection.deserialize(energy_nets)
-        obj.filter_layers_dipole = NetworkCollection.deserialize(force_nets)
+        obj.filter_layers_force = NetworkCollection.deserialize(force_nets)
         return obj
 
     def get_dim_fparam(self) -> int:
@@ -607,7 +607,7 @@ class EnergyFittingNetDirect(Fitting):
         )  # jit assertion
         if self.mixed_types:
             # direct force
-            vec_out = self.filter_layers_dipole.networks[0](xx)
+            vec_out = self.filter_layers_force.networks[0](xx)
             assert list(vec_out.size()) == [nf, nloc, self.out_dim]
             # (nf x nloc) x 1 x od
             vec_out = vec_out.view(-1, 1, self.out_dim)
@@ -625,23 +625,28 @@ class EnergyFittingNetDirect(Fitting):
                 outs + atom_energy + self.bias_atom_e[atype].to(self.prec)
             )  # Shape is [nframes, natoms[0], 1]
         else:
+            vec_out = torch.zeros(
+                (nf, nloc, 3),
+                dtype=self.prec,
+                device=descriptor.device,
+            )  # jit assertion
             # direct force
-            for type_i, ll in enumerate(self.filter_layers_dipole.networks):
+            for type_i, ll in enumerate(self.filter_layers_force.networks):
                 mask = (atype == type_i).unsqueeze(-1)
                 mask = torch.tile(mask, (1, 1, 1))
-                vec_out = ll(xx)
-                assert list(vec_out.size()) == [nf, nloc, self.out_dim]
+                vec_out_type = ll(xx)
+                assert list(vec_out_type.size()) == [nf, nloc, self.out_dim]
                 # (nf x nloc) x 1 x od
-                vec_out = vec_out.view(-1, 1, self.out_dim)
+                vec_out_type = vec_out_type.view(-1, 1, self.out_dim)
                 assert gr is not None
                 # (nf x nloc) x od x 3
                 gr = gr.view(-1, self.out_dim, 3)
-                vec_out = (
-                    torch.bmm(vec_out, gr).squeeze(-2).view(nf, nloc, 3)
+                vec_out_type = (
+                    torch.bmm(vec_out_type, gr).squeeze(-2).view(nf, nloc, 3)
                 )  # Shape is [nf, nloc, 3]
-                vec_out = torch.where(mask, vec_out, 0.0)
+                vec_out_type = torch.where(mask, vec_out_type, 0.0)
                 vec_out = (
-                    vec_out + atom_energy
+                    vec_out + vec_out_type
                 )  # Shape is [nframes, natoms[0], 3]
             # energy
             for type_i, ll in enumerate(self.filter_layers.networks):

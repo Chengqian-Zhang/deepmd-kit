@@ -52,6 +52,7 @@ doc_se_a_mask = "Used by the smooth edition of Deep Potential. It can accept a v
 doc_hybrid = "Concatenate of a list of descriptors as a new descriptor."
 # fitting
 doc_ener = "Fit an energy model (potential energy surface)."
+doc_direct_force_ener = "Fit a direct force and energy model."
 doc_dos = "Fit a density of states model. The total density of states / site-projected density of states labels should be provided by `dos.npy` or `atom_dos.npy` in each data system. The file has number of frames lines and number of energy grid columns (times number of atoms in `atom_dos.npy`). See `loss` parameter."
 doc_dipole = "Fit an atomic dipole model. Global dipole labels or atomic dipole labels for all the selected atoms (see `sel_type`) should be provided by `dipole.npy` in each data system. The file either has number of frames lines and 3 times of number of selected atoms columns, or has number of frames lines and 3 columns. See `loss` parameter."
 doc_polar = "Fit an atomic polarizability model. Global polarizazbility labels or atomic polarizability labels for all the selected atoms (see `sel_type`) should be provided by `polarizability.npy` in each data system. The file with has number of frames lines and 9 times of number of selected atoms columns, or has number of frames lines and 9 columns. See `loss` parameter."
@@ -1722,6 +1723,88 @@ def fitting_ener():
         ),
     ]
 
+@fitting_args_plugin.register("direct_force_ener", doc=doc_direct_force_ener)
+def fitting_ener():
+    doc_numb_fparam = "The dimension of the frame parameter. If set to >0, file `fparam.npy` should be included to provided the input fparams."
+    doc_numb_aparam = "The dimension of the atomic parameter. If set to >0, file `aparam.npy` should be included to provided the input aparams."
+    doc_dim_case_embd = "The dimension of the case embedding embedding. When training or fine-tuning a multitask model with case embedding embeddings, this number should be set to the number of model branches."
+    doc_neuron = "The number of neurons in each hidden layers of the fitting net. When two hidden layers are of the same size, a skip connection is built."
+    doc_activation_function = f'The activation function in the fitting net. Supported activation functions are {list_to_doc(ACTIVATION_FN_DICT.keys())} Note that "gelu" denotes the custom operator version, and "gelu_tf" denotes the TF standard version. If you set "None" or "none" here, no activation function will be used.'
+    doc_precision = f"The precision of the fitting net parameters, supported options are {list_to_doc(PRECISION_DICT.keys())} Default follows the interface precision."
+    doc_resnet_dt = 'Whether to use a "Timestep" in the skip connection'
+    doc_trainable = f"Whether the parameters in the fitting net are trainable. This option can be\n\n\
+- bool: True if all parameters of the fitting net are trainable, False otherwise.\n\n\
+- list of bool{doc_only_tf_supported}: Specifies if each layer is trainable. Since the fitting net is composed by hidden layers followed by a output layer, the length of this list should be equal to len(`neuron`)+1."
+    doc_rcond = "The condition number used to determine the initial energy shift for each type of atoms. See `rcond` in :py:meth:`numpy.linalg.lstsq` for more details."
+    doc_seed = "Random seed for parameter initialization of the fitting net"
+    doc_atom_ener = "Specify the atomic energy in vacuum for each type"
+    doc_layer_name = (
+        "The name of the each layer. The length of this list should be equal to n_neuron + 1. "
+        "If two layers, either in the same fitting or different fittings, "
+        "have the same name, they will share the same neural network parameters. "
+        "The shape of these layers should be the same. "
+        "If null is given for a layer, parameters will not be shared."
+    )
+    doc_use_aparam_as_mask = (
+        "Whether to use the aparam as a mask in input."
+        "If True, the aparam will not be used in fitting net for embedding."
+        "When descrpt is se_a_mask, the aparam will be used as a mask to indicate the input atom is real/virtual. And use_aparam_as_mask should be set to True."
+    )
+
+    return [
+        Argument("numb_fparam", int, optional=True, default=0, doc=doc_numb_fparam),
+        Argument("numb_aparam", int, optional=True, default=0, doc=doc_numb_aparam),
+        Argument(
+            "dim_case_embd",
+            int,
+            optional=True,
+            default=0,
+            doc=doc_only_pt_supported + doc_dim_case_embd,
+        ),
+        Argument(
+            "neuron",
+            list[int],
+            optional=True,
+            default=[120, 120, 120],
+            alias=["n_neuron"],
+            doc=doc_neuron,
+        ),
+        Argument(
+            "activation_function",
+            str,
+            optional=True,
+            default="tanh",
+            doc=doc_activation_function,
+        ),
+        Argument("precision", str, optional=True, default="default", doc=doc_precision),
+        Argument("resnet_dt", bool, optional=True, default=True, doc=doc_resnet_dt),
+        Argument(
+            "trainable",
+            [list[bool], bool],
+            optional=True,
+            default=True,
+            doc=doc_trainable,
+        ),
+        Argument(
+            "rcond", [float, type(None)], optional=True, default=None, doc=doc_rcond
+        ),
+        Argument("seed", [int, None], optional=True, doc=doc_seed),
+        Argument(
+            "atom_ener",
+            list[Optional[float]],
+            optional=True,
+            default=[],
+            doc=doc_atom_ener,
+        ),
+        Argument("layer_name", list[str], optional=True, doc=doc_layer_name),
+        Argument(
+            "use_aparam_as_mask",
+            bool,
+            optional=True,
+            default=False,
+            doc=doc_use_aparam_as_mask,
+        ),
+    ]
 
 @fitting_args_plugin.register("dos", doc=doc_dos)
 def fitting_dos():
@@ -2742,6 +2825,58 @@ def loss_property():
         ),
     ]
 
+@loss_args_plugin.register("denoise")
+def loss_denoise():
+    doc_noise_type = "The type of noise to add to the coordinate."
+    doc_noise = "The magnitude of noise to add to the coordinate."
+    doc_noise_mode = "'prob' means the noise is added with a probability.'fix_num' means the noise is added with a fixed number."
+    doc_mask_prob = "The probability of masking a coordinate."
+    doc_mask_coord = "Whether to mask the coordinate."
+    doc_mask_box = "Whether to mask the box."
+    return [
+        Argument(
+            "noise_type",
+            str,
+            optional=True,
+            default="uniform",
+            doc=doc_noise_type,
+        ),
+        Argument(
+            "noise",
+            float,
+            optional=True,
+            default=0.2,
+            doc=doc_noise,
+        ),
+        Argument(
+            "noise_mode",
+            str,
+            optional=True,
+            default="prob",
+            doc=doc_noise_mode,
+        ),
+        Argument(
+            "mask_prob",
+            float,
+            optional=True,
+            default=0.2,
+            doc=doc_mask_prob,
+        ),
+        Argument(
+            "mask_coord",
+            bool,
+            optional=True,
+            default=True,
+            doc=doc_mask_coord,
+        ),
+        Argument(
+            "mask_box",
+            bool,
+            optional=True,
+            default=False,
+            doc=doc_mask_box,
+        ),
+    ]
 
 # YWolfeee: Modified to support tensor type of loss args.
 @loss_args_plugin.register("tensor")

@@ -1912,6 +1912,45 @@ def fitting_property():
         ),
     ]
 
+@fitting_args_plugin.register("denoise", doc=doc_only_pt_supported)
+def fitting_denoise():
+    doc_numb_fparam = "The dimension of the frame parameter. If set to >0, file `fparam.npy` should be included to provided the input fparams."
+    doc_numb_aparam = "The dimension of the atomic parameter. If set to >0, file `aparam.npy` should be included to provided the input aparams."
+    doc_dim_case_embd = "The dimension of the case embedding embedding. When training or fine-tuning a multitask model with case embedding embeddings, this number should be set to the number of model branches."
+    doc_neuron = "The number of neurons in each hidden layers of the fitting net. When two hidden layers are of the same size, a skip connection is built"
+    doc_activation_function = f'The activation function in the fitting net. Supported activation functions are {list_to_doc(ACTIVATION_FN_DICT.keys())} Note that "gelu" denotes the custom operator version, and "gelu_tf" denotes the TF standard version. If you set "None" or "none" here, no activation function will be used.'
+    doc_resnet_dt = 'Whether to use a "Timestep" in the skip connection'
+    doc_precision = f"The precision of the fitting net parameters, supported options are {list_to_doc(PRECISION_DICT.keys())} Default follows the interface precision."
+    doc_seed = "Random seed for parameter initialization of the fitting net"
+    return [
+        Argument("numb_fparam", int, optional=True, default=0, doc=doc_numb_fparam),
+        Argument("numb_aparam", int, optional=True, default=0, doc=doc_numb_aparam),
+        Argument(
+            "dim_case_embd",
+            int,
+            optional=True,
+            default=0,
+            doc=doc_only_pt_supported + doc_dim_case_embd,
+        ),
+        Argument(
+            "neuron",
+            list[int],
+            optional=True,
+            default=[120, 120, 120],
+            alias=["n_neuron"],
+            doc=doc_neuron,
+        ),
+        Argument(
+            "activation_function",
+            str,
+            optional=True,
+            default="tanh",
+            doc=doc_activation_function,
+        ),
+        Argument("resnet_dt", bool, optional=True, default=True, doc=doc_resnet_dt),
+        Argument("precision", str, optional=True, default="default", doc=doc_precision),
+        Argument("seed", [int, None], optional=True, doc=doc_seed),
+    ]
 
 @fitting_args_plugin.register("polar", doc=doc_polar)
 def fitting_polar():
@@ -2832,7 +2871,10 @@ def loss_denoise():
     doc_noise_mode = "'prob' means the noise is added with a probability.'fix_num' means the noise is added with a fixed number."
     doc_mask_prob = "The probability of masking a coordinate."
     doc_mask_coord = "Whether to mask the coordinate."
-    doc_mask_box = "Whether to mask the box."
+    doc_mask_cell = "Whether to mask the cell."
+    doc_cell_pert_fraction = "A fraction determines how much (relatively) will cell deform."
+    doc_pref_f = "The preference factor for force."
+    doc_pref_v = "The preference factor for virial."
     return [
         Argument(
             "noise_type",
@@ -2870,12 +2912,33 @@ def loss_denoise():
             doc=doc_mask_coord,
         ),
         Argument(
-            "mask_box",
+            "mask_cell",
             bool,
             optional=True,
             default=False,
-            doc=doc_mask_box,
+            doc=doc_mask_cell,
         ),
+        Argument(
+            "cell_pert_fraction",
+            float,
+            optional=True,
+            default=0.0,
+            doc=doc_cell_pert_fraction,
+        ),
+        Argument(
+            "pref_f",
+            float,
+            optional=True,
+            default=1.0,
+            doc=doc_pref_f,
+        ),
+        Argument(
+            "pref_v",
+            float,
+            optional=True,
+            default=1.0,
+            doc=doc_pref_v,
+        ),   
     ]
 
 # YWolfeee: Modified to support tensor type of loss args.

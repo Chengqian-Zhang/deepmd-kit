@@ -4,6 +4,7 @@ from typing import (
 )
 
 import numpy as np
+import logging
 import torch
 import torch.nn.functional as F
 
@@ -22,7 +23,29 @@ from deepmd.utils.data import (
 from deepmd.utils.version import (
     check_version_compatibility,
 )
+from deepmd.pt.utils.region import (
+    phys2inter,
+    inter2phys,
+)
+from IPython import embed
 
+log = logging.getLogger(__name__)
+
+def get_cell_perturb_matrix(cell_pert_fraction: float):
+    if cell_pert_fraction < 0:
+        raise RuntimeError("cell_pert_fraction can not be negative")
+    e0 = torch.rand(6)
+    e = e0 * 2 * cell_pert_fraction - cell_pert_fraction
+    cell_pert_matrix = torch.tensor(
+        [
+            [1 + e[0], 0.5 * e[5], 0.5 * e[4]],
+            [0.5 * e[5], 1 + e[1], 0.5 * e[3]],
+            [0.5 * e[4], 0.5 * e[3], 1 + e[2]],
+        ],
+        dtype=env.GLOBAL_PT_FLOAT_PRECISION,
+        device=env.DEVICE
+    )
+    return cell_pert_matrix
 
 class DenoiseLoss(TaskLoss):
     def __init__(
@@ -35,7 +58,11 @@ class DenoiseLoss(TaskLoss):
         mask_num: int = 1,
         mask_prob: float = 0.2,
         mask_coord: bool = True,
-        mask_box: bool = False,
+        mask_cell: bool = False,
+        cell_pert_fraction: float = 0.0,
+        loss_func: str = "rmse",
+        pref_f: float = 1.0,
+        pref_v: float = 1.0,
         **kwargs,
     ) -> None:
         r"""Construct a layer to compute loss on energy, force and virial.
@@ -56,8 +83,13 @@ class DenoiseLoss(TaskLoss):
             The probability of masking a coordinate.
         mask_coord : bool
             Whether to mask the coordinate.
-        mask_box : bool
-            Whether to mask the box.
+        mask_cell : bool
+            Whether to mask the cell.
+        cell_pert_fraction: float
+            A fraction determines how much (relatively) will cell deform.
+            The cell of each frame is deformed by a symmetric matrix perturbed from identity.
+            The perturbation to the diagonal part is subject to a uniform distribution in [-cell_pert_fraction, cell_pert_fraction),
+            and the perturbation to the off-diagonal part is subject to a uniform distribution in [-0.5*cell_pert_fraction, 0.5*cell_pert_fraction).
         **kwargs
             Other keyword arguments.
         """
@@ -71,7 +103,11 @@ class DenoiseLoss(TaskLoss):
         self.mask_num = mask_num
         self.mask_prob = mask_prob
         self.mask_coord = mask_coord
-        self.mask_box = mask_box
+        self.mask_cell = mask_cell
+        self.cell_pert_fraction = cell_pert_fraction
+        self.loss_func = loss_func
+        self.pref_f = pref_f
+        self.pref_v = pref_v
 
     def forward(self, input_dict, model, label, natoms, learning_rate, mae=False):
         """Return loss on energy and force.
@@ -98,25 +134,37 @@ class DenoiseLoss(TaskLoss):
         """
         nloc = input_dict["atype"].shape[1]
         nbz = input_dict["atype"].shape[0]
+        input_dict["box"] = input_dict["box"].cuda() # box在cpu上，转到gpu上
         label["clean_coord"] = input_dict["coord"].clone().detach()
-        if self.mask_box:
-            label["clean_box"] = input_dict["box"].clone().detach()
-
-        # 将x加noise，并更新label['force']
-        mask_num = 0
-        if self.noise_mode == "fix_num":
-            mask_num = self.mask_num
-            if(nloc < mask_num):
-                mask_num = nloc
-        elif self.noise_mode == "prob":
-            mask_num = int(self.mask_prob * nloc)
-            if mask_num == 0:
-                mask_num = 1
-        else:
-            NotImplementedError(f"Unknown noise mode {self.noise_mode}!")
+        label["clean_box"] = input_dict["box"].clone().detach()
+        label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(-1,3,3)).clone().detach()
+        label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
+        frac_coord = label["clean_frac_coord"].clone().detach()
+        # TODO: coord need to check
+        if self.mask_cell:
+            cell_perturb_matrix_all = torch.zeros((nbz,9), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
+            for ii in range(nbz):
+                # 对于每个batch单独处理
+                cell_perturb_matrix = get_cell_perturb_matrix(self.cell_pert_fraction)
+                input_dict["box"][ii] = torch.matmul(input_dict["box"][ii].reshape(3,3), cell_perturb_matrix).reshape(-1) #盒子乘对称矩阵cell_perturb_matrix得到形变盒子
+                input_dict["coord"][ii] = torch.matmul(input_dict["coord"][ii].reshape(nloc,3), cell_perturb_matrix) #原子笛卡尔坐标也要随之变化
+                cell_perturb_matrix_all[ii] = cell_perturb_matrix.reshape(-1)
+            label["virial"] = cell_perturb_matrix_all.clone().detach()
 
         if self.mask_coord:
-            noise_on_coord_all = torch.zeros(input_dict["coord"].shape, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE) 
+            # 将x加noise，并更新label['force']
+            mask_num = 0
+            if self.noise_mode == "fix_num":
+                mask_num = self.mask_num
+                if(nloc < mask_num):
+                    mask_num = nloc
+            elif self.noise_mode == "prob":
+                mask_num = int(self.mask_prob * nloc)
+                if mask_num == 0:
+                    mask_num = 1
+            else:
+                NotImplementedError(f"Unknown noise mode {self.noise_mode}!")
+
             coord_mask_all = torch.zeros(input_dict["atype"].shape, dtype=torch.bool, device=env.DEVICE) 
             for ii in range(nbz):
                 # 对于每个batch单独处理
@@ -131,47 +179,40 @@ class DenoiseLoss(TaskLoss):
                     NotImplementedError(f"Unknown noise type {self.noise_type}!")
                 
                 noise_on_coord = torch.tensor(noise_on_coord, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE) # mask_num 3
-                input_dict["coord"][ii][coord_mask ,:] += noise_on_coord # nbz mask_num 3 //                 
-                noise_on_coord = noise_on_coord.detach()
-
-                noise_on_coord_all[ii] = noise_on_coord
+                frac_coord[ii][coord_mask ,:] += noise_on_coord # nbz mask_num 3 //       
+                input_dict["coord"][ii] = inter2phys(frac_coord[ii], input_dict["box"][ii].reshape(3,3))
                 coord_mask_all[ii] = torch.tensor(coord_mask, dtype=torch.bool, device=env.DEVICE)
             label['coord_mask'] = coord_mask_all
-            label["force"] = (label["clean_coord"] - input_dict["coord"]).clone().detach()
-            assert label["force"][coord_mask_all].view(nbz,nloc,3).allclose(-1.00 * noise_on_coord_all.view(nbz,nloc,3))
-        else:           
-            NotImplementedError(f"One must mask coord in denoise mode!")
-        
-        if self.mask_box:
-            raise RuntimeError(f"Mask box is not supported yet.")
+            label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
+
+        if (not self.mask_coord) and (not self.mask_cell):
+            raise RuntimeError("At least one of mask_coord and mask_cell should be True!")
 
         model_pred = model(**input_dict)
 
         loss = torch.zeros(1, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)[0]
         more_loss = {}
 
-        force_pred = model_pred["force"]
-        force_label = label["force"]
-        diff_f = (force_label - force_pred).reshape(-1)
-
-        if not self.use_l1_all:
+        diff_f = (label["force"] - model_pred["force"]).reshape(-1)
+        diff_v = (label["virial"] - model_pred["virial"]).reshape(-1)
+        if self.loss_func == "rmse":
             l2_force_loss = torch.mean(torch.square(diff_f))
-            if not self.inference:
-                more_loss["l2_coord_loss"] = l2_force_loss.detach()
-            loss += l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION)
+            l2_virial_loss = torch.mean(torch.square(diff_v))
             rmse_f = l2_force_loss.sqrt()
-            more_loss["rmse_coord"] = rmse_f.detach()
-        else:
-            l1_force_loss = F.l1_loss(force_label, force_pred, reduction="none")
-            more_loss["mae_coord"] = l1_force_loss.mean().detach()
+            rmse_v = l2_virial_loss.sqrt()
+            more_loss["rmse_force"] = rmse_f.detach()
+            more_loss["rmse_virial"] = rmse_v.detach()
+            loss += self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION) 
+        elif self.loss_func == "mae":
+            l1_force_loss = F.l1_loss(label["force"], model_pred["force"], reduction="none")
+            l1_virial_loss = F.l1_loss(label["virial"], model_pred["virial"], reduction="none")
+            more_loss["mae_force"] = l1_force_loss.mean().detach()
+            more_loss["mae_virial"] = l1_virial_loss.mean().detach()
             l1_force_loss = l1_force_loss.sum(-1).mean(-1).sum()
-            loss += l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION)
-        if mae:
-            mae_f = torch.mean(torch.abs(diff_f))
-            more_loss["mae_coord"] = mae_f.detach()
-
-        if not self.inference:
-            more_loss["rmse"] = torch.sqrt(loss.detach())
+            l1_virial_loss = l1_virial_loss.sum()
+            loss += self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION)
+        else:
+            raise RuntimeError(f"Unknown loss function {self.loss_func}!")
         return model_pred, loss, more_loss
 
     @property

@@ -18,6 +18,7 @@ from .dp_model import (
 from .make_model import (
     make_model,
 )
+from IPython import embed
 
 DPEnergyModel_ = make_model(DPEnergyAtomicModel)
 

@@ -69,6 +69,9 @@ from .polar_model import (
 from .property_model import (
     PropertyModel,
 )
+from .denoise_model import (
+    DenoiseModel,
+)
 from .spin_model import (
     SpinEnergyModel,
     SpinModel,
@@ -94,6 +97,8 @@ def _get_standard_model_components(model_params, ntypes):
         fitting_net["embedding_width"] = descriptor.get_dim_emb()
     fitting_net["dim_descrpt"] = descriptor.get_dim_out()
     grad_force = "direct" not in fitting_net["type"]
+    if fitting_net["type"] in ["denoise"]:
+        fitting_net["out_dim"] = descriptor.get_dim_emb()
     if not grad_force:
         fitting_net["out_dim"] = descriptor.get_dim_emb()
         if "ener" in fitting_net["type"]:
@@ -265,6 +270,8 @@ def get_standard_model(model_params):
         modelcls = EnergyModel
     elif fitting_net_type == "property":
         modelcls = PropertyModel
+    elif fitting_net_type == "denoise":
+        modelcls = DenoiseModel
     else:
         raise RuntimeError(f"Unknown fitting type: {fitting_net_type}")
 

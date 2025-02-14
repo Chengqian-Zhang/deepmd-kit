@@ -197,7 +197,7 @@ class DenoiseNet(Fitting):
             networks=[
                 FittingNet(
                     in_dim,
-                    self.out_dim,
+                    3,
                     self.neuron,
                     self.activation_function,
                     self.resnet_dt,
@@ -526,15 +526,7 @@ class DenoiseNet(Fitting):
         if self.mixed_types:
             # direct force
             vec_out = self.filter_layers_force.networks[0](xx)
-            assert list(vec_out.size()) == [nf, nloc, self.out_dim]
-            # (nf x nloc) x 1 x od
-            vec_out = vec_out.view(-1, 1, self.out_dim)
-            assert gr is not None
-            # (nf x nloc) x od x 3
-            gr = gr.view(-1, self.out_dim, 3)
-            vec_out = (
-                torch.bmm(vec_out, gr).squeeze(-2).view(nf, nloc, 3)
-            )  # Shape is [nf, nloc, 3]
+            assert list(vec_out.size()) == [nf, nloc, 3]
             # virial
             atom_virial = self.filter_layers_virial.networks[0](xx)
             outs = outs + atom_virial # Shape is [nframes, natoms[0], 6]
@@ -549,15 +541,7 @@ class DenoiseNet(Fitting):
                 mask = (atype == type_i).unsqueeze(-1)
                 mask = torch.tile(mask, (1, 1, 1))
                 vec_out_type = ll(xx)
-                assert list(vec_out_type.size()) == [nf, nloc, self.out_dim]
-                # (nf x nloc) x 1 x od
-                vec_out_type = vec_out_type.view(-1, 1, self.out_dim)
-                assert gr is not None
-                # (nf x nloc) x od x 3
-                gr = gr.view(-1, self.out_dim, 3)
-                vec_out_type = (
-                    torch.bmm(vec_out_type, gr).squeeze(-2).view(nf, nloc, 3)
-                )  # Shape is [nf, nloc, 3]
+                assert list(vec_out_type.size()) == [nf, nloc, 3]
                 vec_out_type = torch.where(mask, vec_out_type, 0.0)
                 vec_out = (
                     vec_out + vec_out_type

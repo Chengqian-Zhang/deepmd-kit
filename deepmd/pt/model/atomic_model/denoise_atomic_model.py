@@ -26,27 +26,4 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         ret: dict[str, torch.Tensor],
         atype: torch.Tensor,
     ):
-        nbz = ret["virial"].shape[0]
-        nloc = ret["virial"].shape[1]
-        symmetry_virial = torch.zeros(
-            nbz,
-            nloc,
-            3,
-            3,
-            dtype=ret["virial"].dtype,
-            device=ret["virial"].device,
-        )
-        for ii in range(nbz):
-            for jj in range(nloc):
-                e = ret["virial"][ii][jj]
-                symmetry_virial[ii][jj] = torch.tensor(
-                    [
-                        [1 + e[0], 0.5 * e[5], 0.5 * e[4]],
-                        [0.5 * e[5], 1 + e[1], 0.5 * e[3]],
-                        [0.5 * e[4], 0.5 * e[3], 1 + e[2]],
-                    ],
-                    dtype=ret["virial"].dtype,
-                    device=ret["virial"].device
-                )
-        ret["virial"] = symmetry_virial.reshape(nbz, nloc, 9)
         return ret

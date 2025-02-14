@@ -45,7 +45,7 @@ def get_cell_perturb_matrix(cell_pert_fraction: float):
         dtype=env.GLOBAL_PT_FLOAT_PRECISION,
         device=env.DEVICE
     )
-    return cell_pert_matrix
+    return cell_pert_matrix, e
 
 class DenoiseLoss(TaskLoss):
     def __init__(
@@ -142,14 +142,14 @@ class DenoiseLoss(TaskLoss):
         frac_coord = label["clean_frac_coord"].clone().detach()
         # TODO: coord need to check
         if self.mask_cell:
-            cell_perturb_matrix_all = torch.zeros((nbz,9), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
+            e_all = torch.zeros((nbz,6), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
             for ii in range(nbz):
                 # 对于每个batch单独处理
-                cell_perturb_matrix = get_cell_perturb_matrix(self.cell_pert_fraction)
+                cell_perturb_matrix, e = get_cell_perturb_matrix(self.cell_pert_fraction)
                 input_dict["box"][ii] = torch.matmul(input_dict["box"][ii].reshape(3,3), cell_perturb_matrix).reshape(-1) #盒子乘对称矩阵cell_perturb_matrix得到形变盒子
                 input_dict["coord"][ii] = torch.matmul(input_dict["coord"][ii].reshape(nloc,3), cell_perturb_matrix) #原子笛卡尔坐标也要随之变化
-                cell_perturb_matrix_all[ii] = cell_perturb_matrix.reshape(-1)
-            label["virial"] = cell_perturb_matrix_all.clone().detach()
+                e_all[ii] = e.reshape(-1)
+            label["virial"] = e_all.clone().detach()
 
         if self.mask_coord:
             # 将x加noise，并更新label['force']

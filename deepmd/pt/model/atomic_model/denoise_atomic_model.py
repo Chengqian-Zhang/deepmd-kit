@@ -51,5 +51,5 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         matrices[:, 1, 2] = matrices[:, 2, 1] = 0.5 * virial_2d[:, 3]  # (1,2) & (2,1)
 
         # 恢复原始形状 [nbz, nloc, 3, 3] -> [nbz, nloc, 9]
-        ret["virial"] = matrices.view(*virial.shape[:2], 9)
+        ret["virial"] = matrices.view(virial.shape[0], virial.shape[1], 9)
         return ret

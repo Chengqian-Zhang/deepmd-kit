@@ -140,7 +140,6 @@ class DenoiseLoss(TaskLoss):
         label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(-1,3,3)).clone().detach()
         label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
         frac_coord = label["clean_frac_coord"].clone().detach()
-        # TODO: coord need to check
         if self.mask_cell:
             cell_perturb_matrix_all = torch.zeros((nbz,9), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
             for ii in range(nbz):

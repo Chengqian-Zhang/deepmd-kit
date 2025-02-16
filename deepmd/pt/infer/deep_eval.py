@@ -40,6 +40,9 @@ from deepmd.infer.deep_property import (
 from deepmd.infer.deep_wfc import (
     DeepWFC,
 )
+from deepmd.infer.deep_denoise import (
+    DeepDenoise,
+)
 from deepmd.pt.model.model import (
     get_model,
 )

@@ -431,7 +431,7 @@ class DenoiseNet(Fitting):
         h2: Optional[torch.Tensor] = None,
         fparam: Optional[torch.Tensor] = None,
         aparam: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, None]:
+    ) -> dict[str, torch.Tensor]:
         """Based on embedding net output, alculate total energy.
 
         Args:

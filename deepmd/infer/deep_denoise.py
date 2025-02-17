@@ -142,7 +142,8 @@ class DeepDenoise(DeepEval):
 
         # update frac coord
         rec_cells = np.linalg.inv(cells)
-        frac_coords = np.remainder(np.matmul(coords, rec_cells), 1.0)
+        #frac_coords = np.remainder(np.matmul(coords, rec_cells), 1.0)
+        frac_coords = np.matmul(coords, rec_cells)
         assert frac_coords.shape == force.shape
         relax_frac_coords = frac_coords + force
 

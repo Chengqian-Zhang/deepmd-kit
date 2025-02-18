@@ -155,6 +155,6 @@ class DeepDenoise(DeepEval):
         # get final coord
         relax_coords = np.matmul(relax_frac_coords, relax_box)
 
-        return (relax_coords, relax_box)
+        return (relax_coords, relax_box, force, virial)
 
 __all__ = ["DeepDenoise"]

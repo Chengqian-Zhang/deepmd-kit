@@ -35,6 +35,11 @@ def get_cell_perturb_matrix(cell_pert_fraction: float):
     if cell_pert_fraction < 0:
         raise RuntimeError("cell_pert_fraction can not be negative")
     e0 = torch.rand(6)
+    # hack !!
+    e0[2] = e0[2] * 0.2
+    e0[3] = e0[3] * 0.2
+    e0[4] = e0[4] * 0.2
+    # hack end !!!!
     e = e0 * 2 * cell_pert_fraction - cell_pert_fraction
     cell_pert_matrix = torch.tensor(
         [
@@ -137,9 +142,8 @@ class DenoiseLoss(TaskLoss):
         input_dict["box"] = input_dict["box"].cuda() # box在cpu上，转到gpu上
         label["clean_coord"] = input_dict["coord"].clone().detach()
         label["clean_box"] = input_dict["box"].clone().detach()
-        label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(-1,3,3)).clone().detach()
-        label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
-        frac_coord = label["clean_frac_coord"].clone().detach()
+        label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3)).clone().detach()
+        #label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
         if self.mask_cell:
             cell_perturb_matrix_all = torch.zeros((nbz,9), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
             for ii in range(nbz):
@@ -178,10 +182,10 @@ class DenoiseLoss(TaskLoss):
                     NotImplementedError(f"Unknown noise type {self.noise_type}!")
                 
                 noise_on_coord = torch.tensor(noise_on_coord, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE) # mask_num 3
-                frac_coord[ii][coord_mask ,:] += noise_on_coord # nbz mask_num 3 //       
-                input_dict["coord"][ii] = inter2phys(frac_coord[ii], input_dict["box"][ii].reshape(3,3))
+                input_dict["coord"][ii][coord_mask ,:] += noise_on_coord # nbz mask_num 3 //       
                 coord_mask_all[ii] = torch.tensor(coord_mask, dtype=torch.bool, device=env.DEVICE)
             label['coord_mask'] = coord_mask_all
+            frac_coord = phys2inter(input_dict["coord"], input_dict["box"].reshape(nbz,3,3))
             label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
 
         if (not self.mask_coord) and (not self.mask_cell):

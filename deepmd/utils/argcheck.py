@@ -2872,7 +2872,7 @@ def loss_denoise():
     doc_mask_prob = "The probability of masking a coordinate."
     doc_mask_coord = "Whether to mask the coordinate."
     doc_mask_cell = "Whether to mask the cell."
-    doc_cell_pert_fraction = "A fraction determines how much (relatively) will cell deform."
+    doc_cell_noise = "A value determines how much will cell deform."
     doc_pref_f = "The preference factor for force."
     doc_pref_v = "The preference factor for virial."
     return [
@@ -2919,11 +2919,11 @@ def loss_denoise():
             doc=doc_mask_cell,
         ),
         Argument(
-            "cell_pert_fraction",
+            "cell_noise",
             float,
             optional=True,
             default=0.0,
-            doc=doc_cell_pert_fraction,
+            doc=doc_cell_noise,
         ),
         Argument(
             "pref_f",

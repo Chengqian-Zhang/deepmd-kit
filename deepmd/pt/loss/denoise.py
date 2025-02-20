@@ -31,27 +31,6 @@ from IPython import embed
 
 log = logging.getLogger(__name__)
 
-def get_cell_perturb_matrix(cell_pert_fraction: float):
-    if cell_pert_fraction < 0:
-        raise RuntimeError("cell_pert_fraction can not be negative")
-    e0 = torch.rand(6)
-    # hack !!
-    e0[2] = e0[2] * 0.2
-    e0[3] = e0[3] * 0.2
-    e0[4] = e0[4] * 0.2
-    # hack end !!!!
-    e = e0 * 2 * cell_pert_fraction - cell_pert_fraction
-    cell_pert_matrix = torch.tensor(
-        [
-            [1 + e[0], 0.5 * e[5], 0.5 * e[4]],
-            [0.5 * e[5], 1 + e[1], 0.5 * e[3]],
-            [0.5 * e[4], 0.5 * e[3], 1 + e[2]],
-        ],
-        dtype=env.GLOBAL_PT_FLOAT_PRECISION,
-        device=env.DEVICE
-    )
-    return cell_pert_matrix
-
 class DenoiseLoss(TaskLoss):
     def __init__(
         self,
@@ -64,7 +43,7 @@ class DenoiseLoss(TaskLoss):
         mask_prob: float = 0.2,
         mask_coord: bool = True,
         mask_cell: bool = False,
-        cell_pert_fraction: float = 0.0,
+        cell_noise: float = 0.0,
         loss_func: str = "rmse",
         pref_f: float = 1.0,
         pref_v: float = 1.0,
@@ -90,11 +69,8 @@ class DenoiseLoss(TaskLoss):
             Whether to mask the coordinate.
         mask_cell : bool
             Whether to mask the cell.
-        cell_pert_fraction: float
-            A fraction determines how much (relatively) will cell deform.
-            The cell of each frame is deformed by a symmetric matrix perturbed from identity.
-            The perturbation to the diagonal part is subject to a uniform distribution in [-cell_pert_fraction, cell_pert_fraction),
-            and the perturbation to the off-diagonal part is subject to a uniform distribution in [-0.5*cell_pert_fraction, 0.5*cell_pert_fraction).
+        cell_noise: float
+            A value determines how much will cell deform.
         **kwargs
             Other keyword arguments.
         """
@@ -109,7 +85,7 @@ class DenoiseLoss(TaskLoss):
         self.mask_prob = mask_prob
         self.mask_coord = mask_coord
         self.mask_cell = mask_cell
-        self.cell_pert_fraction = cell_pert_fraction
+        self.cell_noise = cell_noise
         self.loss_func = loss_func
         self.pref_f = pref_f
         self.pref_v = pref_v
@@ -148,7 +124,13 @@ class DenoiseLoss(TaskLoss):
             cell_perturb_matrix_all = torch.zeros((nbz,9), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
             for ii in range(nbz):
                 # 对于每个batch单独处理
-                cell_perturb_matrix = get_cell_perturb_matrix(self.cell_pert_fraction)
+                random_cell_noise = np.random.uniform(low=-self.cell_noise, high=self.cell_noise, size=(3, 3))
+                random_cell_noise = torch.tensor(random_cell_noise, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
+                tmp_box_ii = input_dict["box"][ii].reshape(3, 3) + random_cell_noise
+                # tmp_box_ii = input_dict["box"][ii] @ cell_perturb_matrix
+                # cell_perturb_matrix = input_dict["box"][ii].inv @ tmp_box_ii
+                cell_perturb_matrix = torch.inverse(input_dict["box"][ii].reshape(3, 3)) @ tmp_box_ii
+                cell_perturb_matrix = (cell_perturb_matrix + cell_perturb_matrix.T)/2
                 input_dict["box"][ii] = torch.matmul(input_dict["box"][ii].reshape(3,3), cell_perturb_matrix).reshape(-1) #盒子乘对称矩阵cell_perturb_matrix得到形变盒子
                 input_dict["coord"][ii] = torch.matmul(input_dict["coord"][ii].reshape(nloc,3), cell_perturb_matrix) #原子笛卡尔坐标也要随之变化
                 cell_perturb_matrix_all[ii] = cell_perturb_matrix.reshape(-1)
@@ -205,7 +187,7 @@ class DenoiseLoss(TaskLoss):
             rmse_v = l2_virial_loss.sqrt()
             more_loss["rmse_force"] = rmse_f.detach()
             more_loss["rmse_virial"] = rmse_v.detach()
-            loss += self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION) 
+            loss += 300 * (self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
         elif self.loss_func == "mae":
             l1_force_loss = F.l1_loss(label["force"], model_pred["force"], reduction="none")
             l1_virial_loss = F.l1_loss(label["virial"], model_pred["virial"], reduction="none")
@@ -213,7 +195,7 @@ class DenoiseLoss(TaskLoss):
             more_loss["mae_virial"] = l1_virial_loss.mean().detach()
             l1_force_loss = l1_force_loss.sum(-1).mean(-1).sum()
             l1_virial_loss = l1_virial_loss.sum()
-            loss += self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION)
+            loss += 300 * (self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
         else:
             raise RuntimeError(f"Unknown loss function {self.loss_func}!")
         return model_pred, loss, more_loss

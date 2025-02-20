@@ -27,6 +27,9 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         ret: dict[str, torch.Tensor],
         atype: torch.Tensor,
     ):
+        # hack !!!
+        ret["virial"] = ret["virial"]/400
+        ret["force"] = ret["force"]/250
         virial = ret["virial"]  # 原始形状 [nbz, nloc, 6]
 
         # 批量处理所有元素（保留梯度）

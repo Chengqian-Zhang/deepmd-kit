@@ -56,7 +56,7 @@ class DeepDenoise(DeepEval):
                 [
                     OutputVariableDef(
                         "virial",
-                        [9],
+                        [3],
                         reducible=True,
                         r_differentiable=False,
                         c_differentiable=False,
@@ -134,10 +134,10 @@ class DeepDenoise(DeepEval):
             nframes, natoms, 3
         )
         atomic_virial = results["virial"].reshape(
-            nframes, natoms, 3, 3
+            nframes, natoms, 3
         )
         virial = results["virial_redu"].reshape(
-            nframes, 3, 3
+            nframes, 3
         )
 
         # update frac coord
@@ -147,11 +147,18 @@ class DeepDenoise(DeepEval):
         assert frac_coords.shape == force.shape
         relax_frac_coords = frac_coords + force
 
+        nbz = virial.shape[0]
+        cell_pert_matrices = np.zeros((nbz, 3, 3))
+        cell_pert_matrices[:, 0, 0] = 1 + virial[:, 0]  # [0, 0] = 1 + e_i[0]
+        cell_pert_matrices[:, 1, 1] = 1 + virial[:, 1]  # [1, 1] = 1 + e_i[1]
+        cell_pert_matrices[:, 1, 0] = virial[:, 2]  # [1, 0] = e_i[2]
+        cell_pert_matrices[:, 2, 2] = 1  # [2, 2] = 1
+
         # update box 
         # box_noise = box_relax @ cell_pert_matrix(virial),
         # box_relax = box_noise @ cell_pert_matrix(virial).inv
-        assert virial.shape == cells.shape
-        relax_box = np.matmul(cells, np.linalg.inv(virial))
+        assert cell_pert_matrices.shape == cells.shape
+        relax_box = np.matmul(np.linalg.inv(cell_pert_matrices), cells)
         # get final coord
         relax_coords = np.matmul(relax_frac_coords, relax_box)
 

@@ -28,8 +28,10 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         atype: torch.Tensor,
     ):
         # hack !!!
-        ret["virial"] = ret["virial"]/400
-        ret["force"] = ret["force"]/250
+        ret["virial"] = ret["virial"]/200
+        ret["force"] = ret["force"]/200
+
+        '''
         virial = ret["virial"]  # 原始形状 [nbz, nloc, 6]
 
         # 批量处理所有元素（保留梯度）
@@ -55,4 +57,5 @@ class DPDenoiseAtomicModel(DPAtomicModel):
 
         # 恢复原始形状 [nbz, nloc, 3, 3] -> [nbz, nloc, 9]
         ret["virial"] = matrices.view(virial.shape[0], virial.shape[1], 9)
+        '''
         return ret

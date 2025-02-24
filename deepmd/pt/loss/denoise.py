@@ -28,8 +28,41 @@ from deepmd.pt.utils.region import (
     inter2phys,
 )
 from IPython import embed
+import sys
 
 log = logging.getLogger(__name__)
+
+def get_cell_perturb_matrix(cell_pert_fraction: float):
+    if cell_pert_fraction < 0:
+        raise RuntimeError("cell_pert_fraction can not be negative")
+    e0 = torch.rand(6)
+    e = e0 * 2 * cell_pert_fraction - cell_pert_fraction
+    cell_pert_matrix = torch.tensor(
+        [
+            [1 + e[0], 0,        0],
+            [e[5],     1 + e[1], 0],
+            [e[4],     e[3],     1 + e[2]],
+        ],
+        dtype=env.GLOBAL_PT_FLOAT_PRECISION,
+        device=env.DEVICE
+    )
+    return cell_pert_matrix, e
+
+def get_cell_perturb_matrix_HEA(cell_pert_fraction: float):
+    if cell_pert_fraction < 0:
+        raise RuntimeError("cell_pert_fraction can not be negative")
+    e0 = torch.rand(3)
+    e = e0 * 2 * cell_pert_fraction - cell_pert_fraction
+    cell_pert_matrix = torch.tensor(
+        [
+            [1 + e[0], 0,        0],
+            [e[2],     1 + e[1], 0],
+            [0,        0,        1],
+        ],
+        dtype=env.GLOBAL_PT_FLOAT_PRECISION,
+        device=env.DEVICE
+    )
+    return cell_pert_matrix, e
 
 class DenoiseLoss(TaskLoss):
     def __init__(
@@ -113,27 +146,61 @@ class DenoiseLoss(TaskLoss):
         more_loss: dict[str, torch.Tensor]
             Other losses for display.
         """
+
         nloc = input_dict["atype"].shape[1]
         nbz = input_dict["atype"].shape[0]
         input_dict["box"] = input_dict["box"].cuda() # box在cpu上，转到gpu上
+
+        # TODO: 把所有的盒子转化成下三角矩阵，HEA数据集均已经是下三角
+        # 检查下三角
+        for single_box in input_dict["box"]:
+            assert single_box[0] > 0
+            assert single_box[1] == 0
+            assert single_box[2] == 0
+            #assert single_box[3] == 0
+            assert single_box[4] > 0
+            assert single_box[5] == 0
+            assert single_box[6] == 0
+            assert single_box[7] == 0
+            assert single_box[8] > 0
+
+        '''
+        def affine_map(self, trans, box, coord):
+            assert torch.det(trans) != 0
+            new_box = torch.matmul(box, trans)
+            new_coord = torch.matmul(coord, trans)
+            return new_box, new_coord
+        for f_idx in range(nbz):
+            embed()
+            sys.exit()
+            qq, rr = torch.linalg.qr(input_dict["box"][f_idx].reshape(3,3).T)
+            if torch.det(qq) < 0:
+                qq = -qq
+                rr = -rr
+            affine_map(qq, input_dict["box"][f_idx].reshape(3,3), input_dict["coord"])
+            rot = np.eye(3)
+            if self.data["cells"][f_idx][0][0] < 0:
+                rot[0][0] = -1
+            if self.data["cells"][f_idx][1][1] < 0:
+                rot[1][1] = -1
+            if self.data["cells"][f_idx][2][2] < 0:
+                rot[2][2] = -1
+            assert np.linalg.det(rot) == 1
+            self.affine_map(rot, f_idx=f_idx)
+        '''
+
         label["clean_coord"] = input_dict["coord"].clone().detach()
         label["clean_box"] = input_dict["box"].clone().detach()
         label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3)).clone().detach()
         #label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
         if self.mask_cell:
-            cell_perturb_matrix_all = torch.zeros((nbz,9), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
+            cell_perturb_matrix_all = torch.zeros((nbz,3), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
             for ii in range(nbz):
                 # 对于每个batch单独处理
-                random_cell_noise = np.random.uniform(low=-self.cell_noise, high=self.cell_noise, size=(3, 3))
-                random_cell_noise = torch.tensor(random_cell_noise, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
-                tmp_box_ii = input_dict["box"][ii].reshape(3, 3) + random_cell_noise
-                # tmp_box_ii = input_dict["box"][ii] @ cell_perturb_matrix
-                # cell_perturb_matrix = input_dict["box"][ii].inv @ tmp_box_ii
-                cell_perturb_matrix = torch.inverse(input_dict["box"][ii].reshape(3, 3)) @ tmp_box_ii
-                cell_perturb_matrix = (cell_perturb_matrix + cell_perturb_matrix.T)/2
+                cell_perturb_matrix, single_e = get_cell_perturb_matrix_HEA(self.cell_noise)
                 input_dict["box"][ii] = torch.matmul(input_dict["box"][ii].reshape(3,3), cell_perturb_matrix).reshape(-1) #盒子乘对称矩阵cell_perturb_matrix得到形变盒子
                 input_dict["coord"][ii] = torch.matmul(input_dict["coord"][ii].reshape(nloc,3), cell_perturb_matrix) #原子笛卡尔坐标也要随之变化
-                cell_perturb_matrix_all[ii] = cell_perturb_matrix.reshape(-1)
+                cell_perturb_matrix_all[ii] = single_e.reshape(-1)
             label["virial"] = cell_perturb_matrix_all.clone().detach()
 
         if self.mask_coord:
@@ -173,7 +240,7 @@ class DenoiseLoss(TaskLoss):
         if (not self.mask_coord) and (not self.mask_cell):
             raise RuntimeError("At least one of mask_coord and mask_cell should be True!")
 
-        model_pred = model(**input_dict)
+        model_pred = model(**input_dict)      
 
         loss = torch.zeros(1, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)[0]
         more_loss = {}
@@ -187,7 +254,7 @@ class DenoiseLoss(TaskLoss):
             rmse_v = l2_virial_loss.sqrt()
             more_loss["rmse_force"] = rmse_f.detach()
             more_loss["rmse_virial"] = rmse_v.detach()
-            loss += 300 * (self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
+            loss += 200 * (self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
         elif self.loss_func == "mae":
             l1_force_loss = F.l1_loss(label["force"], model_pred["force"], reduction="none")
             l1_virial_loss = F.l1_loss(label["virial"], model_pred["virial"], reduction="none")
@@ -195,7 +262,7 @@ class DenoiseLoss(TaskLoss):
             more_loss["mae_virial"] = l1_virial_loss.mean().detach()
             l1_force_loss = l1_force_loss.sum(-1).mean(-1).sum()
             l1_virial_loss = l1_virial_loss.sum()
-            loss += 300 * (self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
+            loss += 200 * (self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
         else:
             raise RuntimeError(f"Unknown loss function {self.loss_func}!")
         return model_pred, loss, more_loss

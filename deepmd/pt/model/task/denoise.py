@@ -216,7 +216,7 @@ class DenoiseNet(Fitting):
             networks=[
                 FittingNet(
                     in_dim,
-                    6,
+                    3,
                     self.neuron,
                     self.activation_function,
                     self.resnet_dt,
@@ -270,7 +270,7 @@ class DenoiseNet(Fitting):
             [
                 OutputVariableDef(
                     "virial",
-                    [6],
+                    [3],
                     reducible=True,
                     r_differentiable=False,
                     c_differentiable=False,
@@ -519,7 +519,7 @@ class DenoiseNet(Fitting):
                 )
 
         outs = torch.zeros(
-            (nf, nloc, 6),
+            (nf, nloc, 3),
             dtype=self.prec,
             device=descriptor.device,
         )  # jit assertion

@@ -191,6 +191,7 @@ class DenoiseLoss(TaskLoss):
 
         label["clean_coord"] = input_dict["coord"].clone().detach()
         label["clean_box"] = input_dict["box"].clone().detach()
+        origin_frac_coord = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3))
         label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3)).clone().detach()
         #label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
         if self.mask_cell:
@@ -198,11 +199,11 @@ class DenoiseLoss(TaskLoss):
             for ii in range(nbz):
                 # 对于每个batch单独处理
                 cell_perturb_matrix, single_e = get_cell_perturb_matrix_HEA(self.cell_noise)
-                input_dict["box"][ii] = torch.matmul(input_dict["box"][ii].reshape(3,3), cell_perturb_matrix).reshape(-1) #盒子乘对称矩阵cell_perturb_matrix得到形变盒子
-                input_dict["coord"][ii] = torch.matmul(input_dict["coord"][ii].reshape(nloc,3), cell_perturb_matrix) #原子笛卡尔坐标也要随之变化
+                input_dict["box"][ii] = torch.matmul(cell_perturb_matrix, input_dict["box"][ii].reshape(3,3)).reshape(-1) #盒子左乘下三角矩阵cell_perturb_matrix得到形变盒子
+                input_dict["coord"][ii] = torch.matmul(origin_frac_coord[ii].reshape(nloc,3), input_dict["box"][ii].reshape(3,3)) #原子笛卡尔坐标也要随之变化
                 cell_perturb_matrix_all[ii] = single_e.reshape(-1)
             label["virial"] = cell_perturb_matrix_all.clone().detach()
-
+ 
         if self.mask_coord:
             # 将x加noise，并更新label['force']
             mask_num = 0

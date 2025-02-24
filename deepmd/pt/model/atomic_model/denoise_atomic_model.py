@@ -38,7 +38,7 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         # 重塑为二维张量以便处理 [batch_size * nloc, 9]
         virial_2d = virial.view(-1, 6)
 
-        # 构建3x3对称矩阵（向量化操作）
+        # 构建3x3对称矩阵(向量化操作)
         # 每个元素的索引对应原始矩阵位置:
         # [0, 1, 2] 为对角线元素
         # [3, 4, 5] 对应下三角元素（自动保持对称性）

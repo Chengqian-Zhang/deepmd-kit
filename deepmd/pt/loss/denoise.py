@@ -51,13 +51,13 @@ def get_cell_perturb_matrix(cell_pert_fraction: float):
 def get_cell_perturb_matrix_HEA(cell_pert_fraction: float):
     if cell_pert_fraction < 0:
         raise RuntimeError("cell_pert_fraction can not be negative")
-    e0 = torch.rand(3)
+    e0 = torch.rand(4)
     e = e0 * 2 * cell_pert_fraction - cell_pert_fraction
     cell_pert_matrix = torch.tensor(
         [
-            [1 + e[0], 0,        0],
-            [e[2],     1 + e[1], 0],
-            [0,        0,        1],
+            [1 + e[0], 0,        0       ],
+            [e[3],     1 + e[1], 0       ],
+            [0,        0,        1 + e[2]],
         ],
         dtype=env.GLOBAL_PT_FLOAT_PRECISION,
         device=env.DEVICE
@@ -195,7 +195,7 @@ class DenoiseLoss(TaskLoss):
         label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3)).clone().detach()
         #label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
         if self.mask_cell:
-            cell_perturb_matrix_all = torch.zeros((nbz,3), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
+            cell_perturb_matrix_all = torch.zeros((nbz,4), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
             for ii in range(nbz):
                 # 对于每个batch单独处理
                 cell_perturb_matrix, single_e = get_cell_perturb_matrix_HEA(self.cell_noise)
@@ -241,7 +241,8 @@ class DenoiseLoss(TaskLoss):
         if (not self.mask_coord) and (not self.mask_cell):
             raise RuntimeError("At least one of mask_coord and mask_cell should be True!")
 
-        model_pred = model(**input_dict)      
+        model_pred = model(**input_dict)
+        embed()
 
         loss = torch.zeros(1, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)[0]
         more_loss = {}

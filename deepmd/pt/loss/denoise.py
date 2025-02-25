@@ -242,7 +242,6 @@ class DenoiseLoss(TaskLoss):
             raise RuntimeError("At least one of mask_coord and mask_cell should be True!")
 
         model_pred = model(**input_dict)
-        embed()
 
         loss = torch.zeros(1, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)[0]
         more_loss = {}

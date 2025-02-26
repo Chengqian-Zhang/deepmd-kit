@@ -203,7 +203,7 @@ class DenoiseLoss(TaskLoss):
                 input_dict["coord"][ii] = torch.matmul(origin_frac_coord[ii].reshape(nloc,3), input_dict["box"][ii].reshape(3,3)) #原子笛卡尔坐标也要随之变化
                 cell_perturb_matrix_all[ii] = single_e.reshape(-1)
             label["virial"] = cell_perturb_matrix_all.clone().detach()
- 
+
         if self.mask_coord:
             # 将x加noise，并更新label['force']
             mask_num = 0
@@ -228,8 +228,12 @@ class DenoiseLoss(TaskLoss):
                     noise_on_coord = np.random.uniform(
                         low=-self.noise, high=self.noise, size=(mask_num, 3)
                     )
+                elif self.noise_type == "gaussian":
+                    noise_on_coord = np.random.normal(
+                        loc=0.0, scale=self.noise, size=(mask_num, 3)
+                    )
                 else:
-                    NotImplementedError(f"Unknown noise type {self.noise_type}!")
+                    raise NotImplementedError(f"Unknown noise type {self.noise_type}!")
                 
                 noise_on_coord = torch.tensor(noise_on_coord, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE) # mask_num 3
                 input_dict["coord"][ii][coord_mask ,:] += noise_on_coord # nbz mask_num 3 //       

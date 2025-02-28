@@ -188,62 +188,19 @@ class DenoiseLoss(TaskLoss):
             assert np.linalg.det(rot) == 1
             self.affine_map(rot, f_idx=f_idx)
         '''
-
-        label["clean_coord"] = input_dict["coord"].clone().detach()
-        label["clean_box"] = input_dict["box"].clone().detach()
-        origin_frac_coord = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3))
+        
+        nbz = input_dict["atype"].shape[0]
+        frac_coord = phys2inter(input_dict["coord"], input_dict["box"].reshape(nbz,3,3)).clone().detach()
         label["clean_frac_coord"] = phys2inter(label["clean_coord"], label["clean_box"].reshape(nbz,3,3)).clone().detach()
-        #label["clean_frac_coord"] = torch.remainder(label["clean_frac_coord"], 1.0)
-        if self.mask_cell:
-            cell_perturb_matrix_all = torch.zeros((nbz,3), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
-            for ii in range(nbz):
-                # 对于每个batch单独处理
-                cell_perturb_matrix, single_e = get_cell_perturb_matrix_HEA(self.cell_noise)
-                input_dict["box"][ii] = torch.matmul(cell_perturb_matrix, input_dict["box"][ii].reshape(3,3)).reshape(-1) #盒子左乘下三角矩阵cell_perturb_matrix得到形变盒子
-                input_dict["coord"][ii] = torch.matmul(origin_frac_coord[ii].reshape(nloc,3), input_dict["box"][ii].reshape(3,3)) #原子笛卡尔坐标也要随之变化
-                cell_perturb_matrix_all[ii] = single_e.reshape(-1)
-            label["virial"] = cell_perturb_matrix_all.clone().detach()
+        label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
 
-        if self.mask_coord:
-            # 将x加noise，并更新label['force']
-            mask_num = 0
-            if self.noise_mode == "fix_num":
-                mask_num = self.mask_num
-                if(nloc < mask_num):
-                    mask_num = nloc
-            elif self.noise_mode == "prob":
-                mask_num = int(self.mask_prob * nloc)
-                if mask_num == 0:
-                    mask_num = 1
-            else:
-                NotImplementedError(f"Unknown noise mode {self.noise_mode}!")
-
-            coord_mask_all = torch.zeros(input_dict["atype"].shape, dtype=torch.bool, device=env.DEVICE) 
-            for ii in range(nbz):
-                # 对于每个batch单独处理
-                noise_on_coord = 0.0
-                coord_mask_res = np.random.choice(range(nloc), mask_num, replace=False).tolist()
-                coord_mask = np.isin(range(nloc), coord_mask_res) # nloc
-                if self.noise_type == "uniform":
-                    noise_on_coord = np.random.uniform(
-                        low=-self.noise, high=self.noise, size=(mask_num, 3)
-                    )
-                elif self.noise_type == "gaussian":
-                    noise_on_coord = np.random.normal(
-                        loc=0.0, scale=self.noise, size=(mask_num, 3)
-                    )
-                else:
-                    raise NotImplementedError(f"Unknown noise type {self.noise_type}!")
-                
-                noise_on_coord = torch.tensor(noise_on_coord, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE) # mask_num 3
-                input_dict["coord"][ii][coord_mask ,:] += noise_on_coord # nbz mask_num 3 //       
-                coord_mask_all[ii] = torch.tensor(coord_mask, dtype=torch.bool, device=env.DEVICE)
-            label['coord_mask'] = coord_mask_all
-            frac_coord = phys2inter(input_dict["coord"], input_dict["box"].reshape(nbz,3,3))
-            label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
-
-        if (not self.mask_coord) and (not self.mask_cell):
-            raise RuntimeError("At least one of mask_coord and mask_cell should be True!")
+        # input["box"] = cell_pert_matrix @ label["clean_box"]
+        cell_pert_matrix = input_dict["box"].reshape(nbz,3,3) @ torch.inverse(label["clean_box"].reshape(nbz,3,3))
+        e = torch.zeros((nbz,3), dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
+        e[:,0]=cell_pert_matrix[:,0,0]-1
+        e[:,1]=cell_pert_matrix[:,1,1]-1
+        e[:,2]=cell_pert_matrix[:,1,0]
+        label["virial"] = e.clone().detach()
 
         model_pred = model(**input_dict)      
 
@@ -275,7 +232,26 @@ class DenoiseLoss(TaskLoss):
     @property
     def label_requirement(self) -> list[DataRequirementItem]:
         """Return data label requirements needed for this loss calculation."""
-        return []
+        label_requirement = []
+        label_requirement.append(
+            DataRequirementItem(
+                "clean_coord",
+                ndof=3,
+                atomic=True,
+                must=True,
+                high_prec=False,
+            )
+        )
+        label_requirement.append(
+            DataRequirementItem(
+                "clean_box",
+                ndof=9,
+                atomic=False,
+                must=True,
+                high_prec=False,
+            )
+        )
+        return label_requirement
 
     def serialize(self) -> dict:
         pass

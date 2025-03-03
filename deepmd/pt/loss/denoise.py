@@ -240,7 +240,8 @@ class DenoiseLoss(TaskLoss):
                 coord_mask_all[ii] = torch.tensor(coord_mask, dtype=torch.bool, device=env.DEVICE)
             label['coord_mask'] = coord_mask_all
             frac_coord = phys2inter(input_dict["coord"], input_dict["box"].reshape(nbz,3,3))
-            label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
+            #label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
+            label["force"] = ((label["clean_frac_coord"] - frac_coord) @ label["clean_box"].reshape(nbz,3,3)).clone().detach()
 
         if (not self.mask_coord) and (not self.mask_cell):
             raise RuntimeError("At least one of mask_coord and mask_cell should be True!")
@@ -259,7 +260,7 @@ class DenoiseLoss(TaskLoss):
             rmse_v = l2_virial_loss.sqrt()
             more_loss["rmse_force"] = rmse_f.detach()
             more_loss["rmse_virial"] = rmse_v.detach()
-            loss += 200 * (self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
+            loss += 29 * self.pref_f * l2_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + 240 * self.pref_v * l2_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION)
         elif self.loss_func == "mae":
             l1_force_loss = F.l1_loss(label["force"], model_pred["force"], reduction="none")
             l1_virial_loss = F.l1_loss(label["virial"], model_pred["virial"], reduction="none")
@@ -267,7 +268,7 @@ class DenoiseLoss(TaskLoss):
             more_loss["mae_virial"] = l1_virial_loss.mean().detach()
             l1_force_loss = l1_force_loss.sum(-1).mean(-1).sum()
             l1_virial_loss = l1_virial_loss.sum()
-            loss += 200 * (self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION))
+            loss += 29 * self.pref_f * l1_force_loss.to(GLOBAL_PT_FLOAT_PRECISION) + 240 * self.pref_v * l1_virial_loss.to(GLOBAL_PT_FLOAT_PRECISION)
         else:
             raise RuntimeError(f"Unknown loss function {self.loss_func}!")
         return model_pred, loss, more_loss

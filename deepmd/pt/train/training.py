@@ -506,17 +506,17 @@ class Trainer:
                     ]
                 
                 #hack
-                key = "model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.matrix"
-                if key in state_dict:  # 原始形状: [240, 3]
-                    new_weight = torch.randn(240, 96)  # 目标形状: [240, 96]
-                    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.matrix"] = new_weight
-                    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force._networks.0.layers.3.matrix"] = new_weight
+                #key = "model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.matrix"
+                #if key in state_dict:  # 原始形状: [240, 3]
+                #    new_weight = torch.randn(240, 96)  # 目标形状: [240, 96]
+                #    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.matrix"] = new_weight
+                #    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force._networks.0.layers.3.matrix"] = new_weight
 
-                key = "model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.bias"
-                if key in state_dict:  # 原始形状: [3]
-                    new_bias = torch.randn(96)  # 目标形状: [96]
-                    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.bias"] = new_bias
-                    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force._networks.0.layers.3.bias"] = new_bias
+                #key = "model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.bias"
+                #if key in state_dict:  # 原始形状: [3]
+                #    new_bias = torch.randn(96)  # 目标形状: [96]
+                #    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force.networks.0.layers.3.bias"] = new_bias
+                #    state_dict["model.Default.atomic_model.fitting_net.filter_layers_force._networks.0.layers.3.bias"] = new_bias
                 #hack over
 
                 self.wrapper.load_state_dict(state_dict)

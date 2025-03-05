@@ -241,7 +241,7 @@ class DenoiseLoss(TaskLoss):
             label['coord_mask'] = coord_mask_all
             frac_coord = phys2inter(input_dict["coord"], input_dict["box"].reshape(nbz,3,3))
             #label["force"] = (label["clean_frac_coord"] - frac_coord).clone().detach()
-            label["force"] = ((label["clean_frac_coord"] - frac_coord) @ label["clean_box"].reshape(nbz,3,3)).clone().detach()
+            label["force"] = ((label["clean_frac_coord"] - frac_coord) @ input_dict["box"].reshape(nbz,3,3)).clone().detach()
 
         if (not self.mask_coord) and (not self.mask_cell):
             raise RuntimeError("At least one of mask_coord and mask_cell should be True!")

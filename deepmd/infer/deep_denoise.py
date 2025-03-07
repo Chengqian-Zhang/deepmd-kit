@@ -142,10 +142,9 @@ class DeepDenoise(DeepEval):
 
         # update frac coord
         rec_cells = np.linalg.inv(cells)
-        #frac_coords = np.remainder(np.matmul(coords, rec_cells), 1.0)
+        assert coords.shape == force.shape
+        coords = coords + force
         frac_coords = np.matmul(coords, rec_cells)
-        assert frac_coords.shape == force.shape
-        #relax_frac_coords = frac_coords + force
 
         nbz = virial.shape[0]
         cell_pert_matrices = np.zeros((nbz, 3, 3))
@@ -161,9 +160,7 @@ class DeepDenoise(DeepEval):
         relax_box = np.matmul(np.linalg.inv(cell_pert_matrices), cells)
 
         # get final coord
-        #relax_coords = np.matmul(relax_frac_coords, relax_box)
-        relax_box_noise_coord = np.matmul(frac_coords, relax_box)
-        relax_coords = relax_box_noise_coord + force
+        relax_coords = np.matmul(frac_coords, relax_box)
 
         return (relax_coords, relax_box, force, virial)
 

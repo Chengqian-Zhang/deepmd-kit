@@ -11,6 +11,11 @@ from .dp_atomic_model import (
     DPAtomicModel,
 )
 from IPython import embed
+from deepmd.pt.utils import (
+    env,
+)
+dtype = env.GLOBAL_PT_FLOAT_PRECISION
+device = env.DEVICE
 
 log = logging.getLogger(__name__)
 
@@ -27,9 +32,9 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         ret: dict[str, torch.Tensor],
         atype: torch.Tensor,
     ):
-        # hack !!!
-        ret["virial"] = ret["virial"]/200
-        ret["force"] = ret["force"]/200
+        ret["virial"] = ret["virial"] * 0.0044
+        ret["force"] = ret["force"] / torch.tensor([8.423723,8.423723,29.17663], dtype=dtype, device=device)
+        ret["force"] = ret["force"] * 0.0656
 
         '''
         virial = ret["virial"]  # 原始形状 [nbz, nloc, 6]

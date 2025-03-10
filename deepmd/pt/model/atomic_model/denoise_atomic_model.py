@@ -33,7 +33,7 @@ class DPDenoiseAtomicModel(DPAtomicModel):
         atype: torch.Tensor,
     ):
         ret["virial"] = ret["virial"] * 0.0044
-        ret["force"] = ret["force"] / torch.tensor([8.423723,8.423723,29.17663], dtype=dtype, device=device)
+        ret["force"] = ret["force"] / torch.tensor([8.423723,8.423723,29.17663], dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE)
         ret["force"] = ret["force"] * 0.0656
 
         '''

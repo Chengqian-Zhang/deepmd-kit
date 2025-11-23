@@ -29,6 +29,7 @@ from deepmd.utils.path import (
     DPH5Path,
     DPPath,
 )
+from functools import lru_cache
 
 log = logging.getLogger(__name__)
 
@@ -622,6 +623,7 @@ class DeepmdData:
             data["box"] = None
         return data
 
+    @lru_cache
     def _load_set(self, set_name: DPPath) -> dict[str, Any]:
         # get nframes
         if not isinstance(set_name, DPPath):

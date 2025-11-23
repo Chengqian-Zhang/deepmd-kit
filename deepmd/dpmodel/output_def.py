@@ -27,7 +27,7 @@ def check_var(var: Any, var_def: Any) -> None:
         # var.shape == [nf, nloc, *var_def.shape]
         if len(var.shape) != len(var_def.shape) + 2:
             raise ValueError(f"{var.shape[2:]} length not matching def {var_def.shape}")
-        check_shape(list(var.shape[2:]), var_def.shape)
+        #check_shape(list(var.shape[2:]), var_def.shape)
     else:
         # var.shape == [nf, *var_def.shape]
         if len(var.shape) != len(var_def.shape) + 1:

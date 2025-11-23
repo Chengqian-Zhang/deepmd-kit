@@ -91,7 +91,7 @@ def _get_standard_model_components(model_params: dict, ntypes: int) -> tuple:
     fitting_net["ntypes"] = descriptor.get_ntypes()
     fitting_net["type_map"] = copy.deepcopy(model_params["type_map"])
     fitting_net["mixed_types"] = descriptor.mixed_types()
-    if fitting_net["type"] in ["dipole", "polar"]:
+    if fitting_net["type"] in ["dipole", "polar", "property"]:
         fitting_net["embedding_width"] = descriptor.get_dim_emb()
     fitting_net["dim_descrpt"] = descriptor.get_dim_out()
     grad_force = "direct" not in fitting_net["type"]

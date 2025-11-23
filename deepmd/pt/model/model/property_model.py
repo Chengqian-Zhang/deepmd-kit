@@ -67,7 +67,7 @@ class PropertyModel(DPModelCommon, DPPropertyModel_):
         )
         model_predict = {}
         model_predict[f"atom_{self.get_var_name()}"] = model_ret[self.get_var_name()]
-        model_predict[self.get_var_name()] = model_ret[f"{self.get_var_name()}_redu"]
+        model_predict[self.get_var_name()] = torch.norm(model_ret[f"{self.get_var_name()}_redu"], dim=1, keepdim=True)
         if "mask" in model_ret:
             model_predict["mask"] = model_ret["mask"]
         return model_predict

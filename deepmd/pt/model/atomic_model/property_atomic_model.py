@@ -48,7 +48,8 @@ class DPPropertyAtomicModel(DPAtomicModel):
             The atom types. nf x nloc. It is useless in property fitting.
 
         """
-        out_bias, out_std = self._fetch_out_stat(self.bias_keys)
-        for kk in self.bias_keys:
-            ret[kk] = ret[kk] * out_std[kk][0] + out_bias[kk][0]
+        # out_bias, out_std = self._fetch_out_stat(self.bias_keys)
+        # for kk in self.bias_keys:
+        #     ret[kk] = ret[kk] * out_std[kk][0] + out_bias[kk][0]
+        # return ret
         return ret

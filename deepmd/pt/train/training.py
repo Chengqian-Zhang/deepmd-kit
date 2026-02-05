@@ -216,7 +216,6 @@ class Trainer:
                 )
                 _data_iter = cycle_iterator(_dataloader)
                 return _dataloader, _data_iter
-
             training_dataloader, training_data_iter = get_dataloader_and_iter(
                 _training_data, _training_params["training_data"]
             )

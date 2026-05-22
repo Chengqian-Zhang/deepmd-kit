@@ -17,6 +17,7 @@ from deepmd.utils import random as dp_random
 from deepmd.utils.path import (
     DPPath,
 )
+from functools import lru_cache
 
 log = logging.getLogger(__name__)
 
@@ -506,6 +507,7 @@ class DeepmdData:
             data["box"] = None
         return data
 
+    @lru_cache
     def _load_set(self, set_name: DPPath):
         # get nframes
         if not isinstance(set_name, DPPath):

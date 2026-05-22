@@ -3,6 +3,7 @@ import functools
 import logging
 from typing import (
     Optional,
+    Tuple,
 )
 
 import torch
@@ -63,18 +64,27 @@ class DPAtomicModel(BaseAtomicModel):
         super().init_out_stat()
         self.enable_eval_descriptor_hook = False
         self.eval_descriptor_list = []
+        self.eval_g2_list = []
+        self.pairs = []
+        self.pair_distance = []
 
     eval_descriptor_list: list[torch.Tensor]
+    eval_g2_list: list[torch.Tensor]
+    pairs: list[torch.Tensor]
+    pair_distance: list[torch.Tensor]
 
     def set_eval_descriptor_hook(self, enable: bool) -> None:
         """Set the hook for evaluating descriptor and clear the cache for descriptor list."""
         self.enable_eval_descriptor_hook = enable
         # = [] does not work; See #4533
         self.eval_descriptor_list.clear()
+        self.eval_g2_list.clear()
+        self.pairs.clear()
+        self.pair_distance.clear()
 
-    def eval_descriptor(self) -> torch.Tensor:
+    def eval_descriptor(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Evaluate the descriptor."""
-        return torch.concat(self.eval_descriptor_list)
+        return (torch.concat(self.eval_descriptor_list), torch.concat(self.eval_g2_list), torch.concat(self.pairs), torch.concat(self.pair_distance))
 
     @torch.jit.export
     def fitting_output_def(self) -> FittingOutputDef:
@@ -245,6 +255,27 @@ class DPAtomicModel(BaseAtomicModel):
         assert descriptor is not None
         if self.enable_eval_descriptor_hook:
             self.eval_descriptor_list.append(descriptor.detach())
+            self.eval_g2_list.append(g2.detach())
+
+            assert nnei == 1200
+            nedge = g2.shape[0]
+            neighbor_mask = nlist != -1
+            nei_indices = nlist[neighbor_mask]
+            frame_indices, atom_indices, _ = torch.where(neighbor_mask) 
+
+            center_types = extended_atype[frame_indices, atom_indices]
+            neighbor_types = extended_atype[frame_indices, nei_indices]
+
+            center_coords = extended_coord[frame_indices, atom_indices]
+            neighbor_coords = extended_coord[frame_indices, nei_indices]
+            distances = torch.linalg.norm(center_coords - neighbor_coords, dim=1)
+            assert distances.shape == (nedge,)
+            type_pairs = torch.stack([center_types, neighbor_types], dim=1)
+            assert type_pairs.shape == (nedge, 2)
+
+            self.pairs.append(type_pairs)
+            self.pair_distance.append(distances)
+
         # energy, force
         fit_ret = self.fitting_net(
             descriptor,

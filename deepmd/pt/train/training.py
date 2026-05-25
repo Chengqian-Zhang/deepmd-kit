@@ -419,6 +419,7 @@ class Trainer:
         # Learning rate
         self.warmup_steps = training_params.get("warmup_steps", 0)
         self.gradient_max_norm = training_params.get("gradient_max_norm", 0.0)
+        self.l2_sp_coeff = training_params.get("l2_sp_coeff", 0.0)
         assert self.num_steps - self.warmup_steps > 0 or self.warmup_steps == 0, (
             "Warm up steps must be less than total training steps!"
         )
@@ -633,6 +634,39 @@ class Trainer:
                 output_device=LOCAL_RANK,
             )
 
+        # L2-SP: capture pretrained descriptor parameters after DDP sync
+        self.pretrained_descriptor_params = None
+        if finetune_model is not None and self.l2_sp_coeff > 0.0:
+            wrapper_module = (
+                self.wrapper.module
+                if dist.is_available() and dist.is_initialized()
+                else self.wrapper
+            )
+            if not self.multi_task:
+                descriptor = wrapper_module.model["Default"].get_descriptor()
+                self.pretrained_descriptor_params = {
+                    name: param.clone().detach()
+                    for name, param in descriptor.named_parameters()
+                }
+            else:
+                self.pretrained_descriptor_params = {}
+                for model_key in self.model_keys:
+                    descriptor = wrapper_module.model[model_key].get_descriptor()
+                    self.pretrained_descriptor_params[model_key] = {
+                        name: param.clone().detach()
+                        for name, param in descriptor.named_parameters()
+                    }
+            log.info(
+                "L2-SP regularization enabled with coefficient %.6e. "
+                "Pretrained descriptor parameters captured.",
+                self.l2_sp_coeff,
+            )
+        elif self.l2_sp_coeff > 0.0 and finetune_model is None:
+            log.warning(
+                "l2_sp_coeff > 0 but no finetune_model provided. "
+                "L2-SP regularization requires --finetune and will be disabled."
+            )
+
         # TODO add lr warmups for multitask
         # author: iProzd
         def warm_up_linear(step: int, warmup_steps: int) -> float:
@@ -761,6 +795,28 @@ class Trainer:
                 model_pred, loss, more_loss = self.wrapper(
                     **input_dict, cur_lr=pref_lr, label=label_dict, task_key=task_key
                 )
+                if (
+                    self.l2_sp_coeff > 0.0
+                    and self.pretrained_descriptor_params is not None
+                ):
+                    _wrapper_module = (
+                        self.wrapper.module
+                        if dist.is_available() and dist.is_initialized()
+                        else self.wrapper
+                    )
+                    _descriptor = _wrapper_module.model[task_key].get_descriptor()
+                    _pre_params = (
+                        self.pretrained_descriptor_params[task_key]
+                        if self.multi_task
+                        else self.pretrained_descriptor_params
+                    )
+                    _l2_sp_penalty = sum(
+                        torch.sum((param - _pre_params[name]) ** 2)
+                        for name, param in _descriptor.named_parameters()
+                        if name in _pre_params
+                    )
+                    loss = loss + 0.5 * self.l2_sp_coeff * _l2_sp_penalty
+                    more_loss["reg_l2sp"] = _l2_sp_penalty.item()
                 loss.backward()
                 if self.gradient_max_norm > 0.0:
                     torch.nn.utils.clip_grad_norm_(

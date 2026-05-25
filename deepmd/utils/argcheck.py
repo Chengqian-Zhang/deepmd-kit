@@ -1368,7 +1368,12 @@ def descrpt_dpa3_args():
     doc_precision = f"The precision of the embedding net parameters, supported options are {list_to_doc(PRECISION_DICT.keys())} Default follows the interface precision."
     doc_exclude_types = "The excluded pairs of types which have no interaction with each other. For example, `[[0, 1]]` means no interaction between type 0 and type 1."
     doc_env_protection = "Protection parameter to prevent division by zero errors during environment matrix calculations. For example, when using paddings, there may be zero distances of neighbors, which may make division by zero error during environment matrix calculations without protection."
-    doc_trainable = "If the parameters in the embedding net is trainable."
+    doc_trainable = (
+        "If the parameters in the embedding net is trainable. "
+        "When set to a bool, all parameters are either trainable or frozen. "
+        "When set to an int N, only the last N repflow layers are trainable "
+        "and all other parameters (including embeddings and earlier layers) are frozen."
+    )
     doc_seed = "Random seed for parameter initialization."
     doc_use_econf_tebd = "Whether to use electronic configuration type embedding."
     doc_use_tebd_bias = "Whether to use bias in the type embedding layer."
@@ -1409,7 +1414,7 @@ def descrpt_dpa3_args():
             default=0.0,
             doc=doc_only_pt_supported + doc_env_protection,
         ),
-        Argument("trainable", bool, optional=True, default=True, doc=doc_trainable),
+        Argument("trainable", [bool, int], optional=True, default=True, doc=doc_trainable),
         Argument("seed", [int, None], optional=True, doc=doc_seed),
         Argument(
             "use_econf_tebd",

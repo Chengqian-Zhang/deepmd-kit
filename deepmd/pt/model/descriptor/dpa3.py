@@ -81,8 +81,10 @@ class DescrptDPA3(BaseDescriptor, torch.nn.Module):
     env_protection : float, optional
         Protection parameter to prevent division by zero errors during environment matrix calculations.
         For example, when using paddings, there may be zero distances of neighbors, which may make division by zero error during environment matrix calculations without protection.
-    trainable : bool, optional
-        If the parameters are trainable.
+    trainable : bool or int, optional
+        If the parameters are trainable. When a bool, all parameters are
+        either trainable or frozen. When an int N, only the last N repflow
+        layers are trainable and all other parameters are frozen.
     seed : int, optional
         Random seed for parameter initialization.
     use_econf_tebd : bool, Optional
@@ -113,7 +115,7 @@ class DescrptDPA3(BaseDescriptor, torch.nn.Module):
         precision: str = "float64",
         exclude_types: list[tuple[int, int]] = [],
         env_protection: float = 0.0,
-        trainable: bool = True,
+        trainable: Union[bool, int] = True,
         seed: Optional[Union[int, list[int]]] = None,
         use_econf_tebd: bool = False,
         use_tebd_bias: bool = False,
@@ -207,8 +209,17 @@ class DescrptDPA3(BaseDescriptor, torch.nn.Module):
         self.ntypes = ntypes
 
         # set trainable
-        for param in self.parameters():
-            param.requires_grad = trainable
+        if isinstance(trainable, bool):
+            for param in self.parameters():
+                param.requires_grad = trainable
+        else:
+            # trainable is int N: freeze everything, then unfreeze last N repflow layers
+            for param in self.parameters():
+                param.requires_grad = False
+            if trainable > 0:
+                for layer in self.repflows.layers[-trainable:]:
+                    for param in layer.parameters():
+                        param.requires_grad = True
         self.compress = False
 
     def get_rcut(self) -> float:

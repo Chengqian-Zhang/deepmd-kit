@@ -3235,6 +3235,12 @@ def training_args(
         "If the gradient norm exceeds this value, it will be clipped to this limit. "
         "No gradient clipping will occur if set to 0."
     )
+    doc_l2_sp_coeff = (
+        "Coefficient delta for L2-SP (L^2 Starting Point) regularization during fine-tuning. "
+        "Adds a penalty term (delta/2)*||theta_descriptor - theta_pre||^2 to anchor the descriptor "
+        "parameters to the pre-trained weights. Set to 0 to disable. "
+        "Only effective when fine-tuning from a pre-trained model via --finetune."
+    )
     doc_stat_file = (
         "The file path for saving the data statistics results. "
         "If set, the results will be saved and directly loaded during the next training session, "
@@ -3348,6 +3354,13 @@ def training_args(
             float,
             optional=True,
             doc=doc_only_pt_supported + doc_gradient_max_norm,
+        ),
+        Argument(
+            "l2_sp_coeff",
+            float,
+            optional=True,
+            default=0.0,
+            doc=doc_only_pt_supported + doc_l2_sp_coeff,
         ),
         Argument(
             "acc_freq",

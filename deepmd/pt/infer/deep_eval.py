@@ -532,6 +532,8 @@ class DeepEval(DeepEvalBackend):
             pt_name = self._OUTDEF_DP2BACKEND[odef.name]
             if pt_name in batch_output:
                 shape = self._get_output_shape(odef, nframes, natoms)
+                if pt_name == "atom_mu":
+                    shape[-1] = 3
                 out = batch_output[pt_name].reshape(shape).detach().cpu().numpy()
                 results.append(out)
             else:

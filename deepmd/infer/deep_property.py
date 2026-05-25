@@ -137,7 +137,7 @@ class DeepProperty(DeepEval):
             **kwargs,
         )
         atomic_property = results[self.get_var_name()].reshape(
-            nframes, natoms, self.get_task_dim()
+            nframes, natoms, self.get_task_dim() * 3
         )
         property = results[f"{self.get_var_name()}_redu"].reshape(
             nframes, self.get_task_dim()

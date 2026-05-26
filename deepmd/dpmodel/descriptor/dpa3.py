@@ -272,10 +272,12 @@ class DescrptDPA3(NativeOP, BaseDescriptor):
     env_protection : float, optional
         Protection parameter to prevent division by zero errors during environment matrix calculations.
         For example, when using paddings, there may be zero distances of neighbors, which may make division by zero error during environment matrix calculations without protection.
-    trainable : bool or int, optional
+    trainable : bool or int or list[int], optional
         If the parameters are trainable. When a bool, all parameters are
         either trainable or frozen. When an int N, only the last N repflow
-        layers are trainable and all other parameters are frozen.
+        layers are trainable and all other parameters are frozen. When a
+        list of ints, only the repflow layers at those indices are trainable
+        (Surgical-FT: e.g. [8] trains only layer 8).
     seed : int, optional
         Random seed for parameter initialization.
     use_econf_tebd : bool, Optional
@@ -306,7 +308,7 @@ class DescrptDPA3(NativeOP, BaseDescriptor):
         precision: str = "float64",
         exclude_types: list[tuple[int, int]] = [],
         env_protection: float = 0.0,
-        trainable: Union[bool, int] = True,
+        trainable: Union[bool, int, list[int]] = True,
         seed: Optional[Union[int, list[int]]] = None,
         use_econf_tebd: bool = False,
         use_tebd_bias: bool = False,

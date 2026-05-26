@@ -1367,7 +1367,7 @@ class Trainer:
             if valid_results:
                 prop_fmt = "   %11.2e %11.2e"
                 for k in train_keys:
-                    print_str += prop_fmt % (valid_results[k], train_results[k])
+                    print_str += prop_fmt % (valid_results.get(k, float("nan")), train_results[k])
             else:
                 prop_fmt = "   %11.2e"
                 for k in train_keys:

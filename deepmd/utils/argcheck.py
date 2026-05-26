@@ -1372,7 +1372,9 @@ def descrpt_dpa3_args():
         "If the parameters in the embedding net is trainable. "
         "When set to a bool, all parameters are either trainable or frozen. "
         "When set to an int N, only the last N repflow layers are trainable "
-        "and all other parameters (including embeddings and earlier layers) are frozen."
+        "and all other parameters (including embeddings and earlier layers) are frozen. "
+        "When set to a list of ints, only the repflow layers at those indices are "
+        "trainable (Surgical-FT, e.g. [8] trains only layer 8)."
     )
     doc_seed = "Random seed for parameter initialization."
     doc_use_econf_tebd = "Whether to use electronic configuration type embedding."
@@ -1414,7 +1416,7 @@ def descrpt_dpa3_args():
             default=0.0,
             doc=doc_only_pt_supported + doc_env_protection,
         ),
-        Argument("trainable", [bool, int], optional=True, default=True, doc=doc_trainable),
+        Argument("trainable", [bool, int, list], optional=True, default=True, doc=doc_trainable),
         Argument("seed", [int, None], optional=True, doc=doc_seed),
         Argument(
             "use_econf_tebd",

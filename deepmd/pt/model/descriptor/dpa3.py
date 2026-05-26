@@ -81,10 +81,12 @@ class DescrptDPA3(BaseDescriptor, torch.nn.Module):
     env_protection : float, optional
         Protection parameter to prevent division by zero errors during environment matrix calculations.
         For example, when using paddings, there may be zero distances of neighbors, which may make division by zero error during environment matrix calculations without protection.
-    trainable : bool or int, optional
+    trainable : bool or int or list[int], optional
         If the parameters are trainable. When a bool, all parameters are
         either trainable or frozen. When an int N, only the last N repflow
-        layers are trainable and all other parameters are frozen.
+        layers are trainable and all other parameters are frozen. When a
+        list of ints, only the repflow layers at those indices are trainable
+        (Surgical-FT: e.g. [8] trains only layer 8).
     seed : int, optional
         Random seed for parameter initialization.
     use_econf_tebd : bool, Optional
@@ -115,7 +117,7 @@ class DescrptDPA3(BaseDescriptor, torch.nn.Module):
         precision: str = "float64",
         exclude_types: list[tuple[int, int]] = [],
         env_protection: float = 0.0,
-        trainable: Union[bool, int] = True,
+        trainable: Union[bool, int, list[int]] = True,
         seed: Optional[Union[int, list[int]]] = None,
         use_econf_tebd: bool = False,
         use_tebd_bias: bool = False,
@@ -212,6 +214,13 @@ class DescrptDPA3(BaseDescriptor, torch.nn.Module):
         if isinstance(trainable, bool):
             for param in self.parameters():
                 param.requires_grad = trainable
+        elif isinstance(trainable, list):
+            # Surgical-FT: freeze all, then unfreeze specific layer indices
+            for param in self.parameters():
+                param.requires_grad = False
+            for k in trainable:
+                for param in self.repflows.layers[k].parameters():
+                    param.requires_grad = True
         else:
             # trainable is int N: freeze everything, then unfreeze last N repflow layers
             for param in self.parameters():

@@ -788,9 +788,9 @@ class DeepEval(DeepEvalBackend):
             aparam=aparam,
             **kwargs,
         )
-        descriptor = model.eval_descriptor()
+        descriptor, g2, pair, pair_dis = model.eval_descriptor()
         model.set_eval_descriptor_hook(False)
-        return to_numpy_array(descriptor)
+        return to_numpy_array(descriptor), to_numpy_array(g2), to_numpy_array(pair), to_numpy_array(pair_dis)
 
     def eval_fitting_last_layer(
         self,

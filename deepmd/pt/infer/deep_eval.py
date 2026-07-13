@@ -165,8 +165,8 @@ class DeepEval(DeepEvalBackend):
                         ] = state_dict[item].clone()
                 state_dict = state_dict_head
             model = get_model(self.input_param).to(DEVICE)
-            if not self.input_param.get("hessian_mode") and not no_jit:
-                model = torch.jit.script(model)
+            # if not self.input_param.get("hessian_mode") and not no_jit:
+            #     model = torch.jit.script(model)
             self.dp = ModelWrapper(model)
             self.dp.load_state_dict(state_dict)
         elif str(self.model_path).endswith(".pth"):
@@ -790,9 +790,9 @@ class DeepEval(DeepEvalBackend):
             aparam=aparam,
             **kwargs,
         )
-        descriptor = model.eval_descriptor()
+        descriptor, g2, pair, pair_dis = model.eval_descriptor()
         model.set_eval_descriptor_hook(False)
-        return to_numpy_array(descriptor)
+        return to_numpy_array(descriptor), to_numpy_array(g2), to_numpy_array(pair), to_numpy_array(pair_dis)
 
     def eval_fitting_last_layer(
         self,

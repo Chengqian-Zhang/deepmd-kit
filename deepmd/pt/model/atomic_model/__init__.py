@@ -54,8 +54,8 @@ from .sezm_atomic_model import (
 
 __all__ = [
     "BaseAtomicModel",
-    "DPClassificationAtomicModel",
     "DPAtomicModel",
+    "DPClassificationAtomicModel",
     "DPDOSAtomicModel",
     "DPDipoleAtomicModel",
     "DPEnergyAtomicModel",

@@ -14,8 +14,8 @@ from deepmd.pt.model.task.classification import (
 
 class TestClassificationLoss(unittest.TestCase):
     def test_cross_entropy_and_accuracy(self) -> None:
-        logits = torch.tensor([[3.0, 1.0, -1.0], [0.0, 2.0, 1.0]])
-        labels = torch.tensor([[0.0], [2.0]])
+        logits = torch.tensor([[3.0, 1.0, -1.0], [0.0, 2.0, 1.0]], device="cpu")
+        labels = torch.tensor([[0.0], [2.0]], device="cpu")
         loss_module = ClassificationLoss(num_classes=3, var_name="class")
 
         _, loss, metrics = loss_module(
@@ -27,15 +27,35 @@ class TestClassificationLoss(unittest.TestCase):
 
         expected = F.cross_entropy(logits, labels.squeeze(1).long())
         torch.testing.assert_close(loss, expected)
-        torch.testing.assert_close(metrics["accuracy"], torch.tensor(0.5))
+        torch.testing.assert_close(metrics["accuracy"], torch.tensor(0.5, device="cpu"))
 
     def test_rejects_out_of_range_label(self) -> None:
         loss_module = ClassificationLoss(num_classes=2, var_name="class")
         with self.assertRaisesRegex(ValueError, "Class labels must be"):
             loss_module(
                 {},
-                lambda: {"class": torch.zeros((1, 2))},
-                {"class": torch.tensor([[2]])},
+                lambda: {"class": torch.zeros((1, 2), device="cpu")},
+                {"class": torch.tensor([[2]], device="cpu")},
+                natoms=1,
+            )
+
+    def test_rejects_fractional_label(self) -> None:
+        loss_module = ClassificationLoss(num_classes=3, var_name="class")
+        with self.assertRaisesRegex(ValueError, "Class labels must be integers"):
+            loss_module(
+                {},
+                lambda: {"class": torch.zeros((1, 3), device="cpu")},
+                {"class": torch.tensor([[1.5]], device="cpu")},
+                natoms=1,
+            )
+
+    def test_rejects_nonfinite_label(self) -> None:
+        loss_module = ClassificationLoss(num_classes=3, var_name="class")
+        with self.assertRaisesRegex(ValueError, "Class labels must be finite"):
+            loss_module(
+                {},
+                lambda: {"class": torch.zeros((1, 3), device="cpu")},
+                {"class": torch.tensor([[float("nan")]], device="cpu")},
                 natoms=1,
             )
 

@@ -681,8 +681,8 @@ def get_model(model_params: dict) -> Any:
 
 
 __all__ = [
-    "ClassificationModel",
     "BaseModel",
+    "ClassificationModel",
     "DOSModel",
     "DPModelCommon",
     "DPZBLModel",

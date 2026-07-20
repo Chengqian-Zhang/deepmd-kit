@@ -50,10 +50,14 @@ class ClassificationLoss(TaskLoss):
                 f"Expected labels with shape ({logits.shape[0]},) or "
                 f"({logits.shape[0]}, 1), but got {tuple(target.shape)}"
             )
+        if target.is_floating_point():
+            if not bool(torch.all(torch.isfinite(target))):
+                raise ValueError("Class labels must be finite integers")
+            if not bool(torch.all(target == torch.round(target))):
+                raise ValueError("Class labels must be integers")
+
         target = target.to(device=logits.device, dtype=torch.long)
-        if bool(torch.any(target < 0)) or bool(
-            torch.any(target >= self.num_classes)
-        ):
+        if bool(torch.any(target < 0)) or bool(torch.any(target >= self.num_classes)):
             raise ValueError(f"Class labels must be in [0, {self.num_classes})")
 
         loss = F.cross_entropy(logits, target)

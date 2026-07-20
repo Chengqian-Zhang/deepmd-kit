@@ -32,8 +32,8 @@ from .tensor import (
 )
 
 __all__ = [
-    "DOSLoss",
     "ClassificationLoss",
+    "DOSLoss",
     "DeNSLoss",
     "DenoiseLoss",
     "EnergyHessianStdLoss",

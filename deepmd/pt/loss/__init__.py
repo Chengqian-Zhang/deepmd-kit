@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
+from .classification import (
+    ClassificationLoss,
+)
 from .denoise import (
     DenoiseLoss,
 )
@@ -30,6 +33,7 @@ from .tensor import (
 
 __all__ = [
     "DOSLoss",
+    "ClassificationLoss",
     "DeNSLoss",
     "DenoiseLoss",
     "EnergyHessianStdLoss",

@@ -41,6 +41,7 @@ from deepmd.loggers.training import (
     format_training_message_per_task,
 )
 from deepmd.pt.loss import (
+    ClassificationLoss,
     DenoiseLoss,
     DeNSLoss,
     DOSLoss,
@@ -2546,6 +2547,10 @@ def get_loss(
         loss_params["var_name"] = var_name
         loss_params["intensive"] = intensive
         return PropertyLoss(**loss_params)
+    elif loss_type == "classification":
+        loss_params["num_classes"] = _model.get_task_dim()
+        loss_params["var_name"] = _model.get_var_name()
+        return ClassificationLoss(**loss_params)
     elif loss_type == "population":
         loss_params["starter_learning_rate"] = start_lr
         return PopulationLoss(**loss_params)

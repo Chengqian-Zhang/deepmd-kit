@@ -40,6 +40,9 @@ from deepmd.utils.spin import (
     Spin,
 )
 
+from .classification_model import (
+    ClassificationModel,
+)
 from .dipole_model import (
     DipoleModel,
 )
@@ -355,6 +358,8 @@ def get_standard_model(model_params: dict) -> BaseModel:
         modelcls = EnergyModel
     elif fitting_net_type == "property":
         modelcls = PropertyModel
+    elif fitting_net_type == "classification":
+        modelcls = ClassificationModel
     elif fitting_net_type == "population":
         modelcls = PopulationModel
     else:
@@ -676,6 +681,7 @@ def get_model(model_params: dict) -> Any:
 
 
 __all__ = [
+    "ClassificationModel",
     "BaseModel",
     "DOSModel",
     "DPModelCommon",

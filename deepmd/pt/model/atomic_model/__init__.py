@@ -17,6 +17,9 @@ DPModel = make_model(DPAtomicModel)
 from .base_atomic_model import (
     BaseAtomicModel,
 )
+from .classification_atomic_model import (
+    DPClassificationAtomicModel,
+)
 from .dipole_atomic_model import (
     DPDipoleAtomicModel,
 )
@@ -51,6 +54,7 @@ from .sezm_atomic_model import (
 
 __all__ = [
     "BaseAtomicModel",
+    "DPClassificationAtomicModel",
     "DPAtomicModel",
     "DPDOSAtomicModel",
     "DPDipoleAtomicModel",

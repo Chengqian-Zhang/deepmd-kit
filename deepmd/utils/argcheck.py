@@ -2891,6 +2891,25 @@ def fitting_property() -> list[Argument]:
     ]
 
 
+@fitting_args_plugin.register("classification", doc=doc_only_pt_supported)
+def fitting_classification() -> list[Argument]:
+    """Arguments for system-level single-label classification."""
+    return [
+        Argument("num_classes", int, optional=False),
+        Argument("label_name", str, optional=True, default="class"),
+        Argument("neuron", list[int], optional=True, default=[128, 128, 128]),
+        Argument("activation_function", str, optional=True, default="tanh"),
+        Argument("resnet_dt", bool, optional=True, default=True),
+        Argument("precision", str, optional=True, default="default"),
+        Argument("seed", [int, None], optional=True),
+        Argument("trainable", [list[bool], bool], optional=True, default=True),
+        Argument("numb_fparam", int, optional=True, default=0),
+        Argument("numb_aparam", int, optional=True, default=0),
+        Argument("default_fparam", list[float], optional=True, default=None),
+        Argument("dim_case_embd", int, optional=True, default=0),
+    ]
+
+
 @fitting_args_plugin.register("polar", doc=doc_polar)
 def fitting_polar() -> list[Argument]:
     doc_numb_fparam = "The dimension of the frame parameter. If set to >0, file `fparam.npy` should be included to provided the input fparams."
@@ -4942,6 +4961,12 @@ def loss_property() -> list[Argument]:
 
 
 # YWolfeee: Modified to support tensor type of loss args.
+@loss_args_plugin.register("classification")
+def loss_classification() -> list[Argument]:
+    """Arguments for single-label cross-entropy loss."""
+    return []
+
+
 @loss_args_plugin.register("tensor")
 def loss_tensor() -> list[Argument]:
     # doc_global_weight = "The prefactor of the weight of global loss. It should be larger than or equal to 0. If only `pref` is provided or both are not provided, training will be global mode, i.e. the shape of 'polarizability.npy` or `dipole.npy` should be #frams x [9 or 3]."

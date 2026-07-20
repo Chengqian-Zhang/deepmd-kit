@@ -2,6 +2,9 @@
 from .base_fitting import (
     BaseFitting,
 )
+from .classification import (
+    ClassificationFittingNet,
+)
 from .denoise import (
     DenoiseNet,
 )
@@ -36,6 +39,7 @@ from .type_predict import (
 
 __all__ = [
     "BaseFitting",
+    "ClassificationFittingNet",
     "DOSFittingNet",
     "DenoiseNet",
     "DipoleFittingNet",
